@@ -4,7 +4,7 @@
 
 LocalVotes is a fully static, client-side web app that looks up every elected official for any US ZIP code — from US Senators down to state legislators. For city councils, school boards, and special districts (which have no free API), it generates targeted search links and curated resources. No server required. No tracking. No ads.
 
-A project of Twin Kites LLC. 
+We want to provide information to all voters. A project of Twin Kites LLC. 
 
 Always available and sharable at: https://twinkites.github.io/localvotes
 
