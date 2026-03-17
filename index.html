@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="LocalVotes — Look up every elected official representing your ZIP code, from Congress to your local school board." />
+  <meta name="theme-color" content="#1a56db" />
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'none';
+    script-src  'self' https://unpkg.com;
+    style-src   'self' https://unpkg.com 'unsafe-inline';
+    connect-src 'self'
+                https://api.zippopotam.us
+                https://api.propublica.org
+                https://v3.openstates.org
+                https://api.open.fec.gov
+                https://api.congress.gov
+                https://geocoding.geo.census.gov
+                https://tigerweb.geo.census.gov
+                https://docs.google.com;
+    img-src     'self' data: https:;
+    font-src    'self';
+    object-src  'none';
+    base-uri    'self';
+    form-action 'self';
+    upgrade-insecure-requests;
+  " />
+  <title>LocalVotes — Know Who Represents You</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <noscript>
+    <style>.hero,.results-section,.loading-wrap { display: none !important; }</style>
+  </noscript>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+</head>
+<body>
+
+  <!-- ============================================================
+       HEADER
+  ============================================================ -->
+  <header class="site-header" role="banner">
+    <div class="container header-inner">
+      <a href="/" class="logo" aria-label="LocalVotes — home">
+        <svg class="logo-icon" aria-hidden="true" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="20" cy="20" r="19" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 20l5 5 11-11" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="logo-text">LocalVotes</span>
+      </a>
+      <nav class="site-nav" aria-label="Site navigation">
+        <a href="#about" class="nav-link">About</a>
+        <a href="#sources" class="nav-link">Data Sources</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       HERO / SEARCH SECTION
+  ============================================================ -->
+  <noscript>
+    <div style="max-width:600px;margin:3rem auto;padding:1.5rem 2rem;background:#fff5f5;border:1px solid #fc8181;border-radius:8px;font-family:sans-serif;color:#742a2a;">
+      <strong>JavaScript is required.</strong>
+      LocalVotes fetches live civic data from government APIs — it needs JavaScript to run.
+      Please enable JavaScript in your browser and reload the page.
+    </div>
+  </noscript>
+
+  <main id="main-content">
+    <section id="search-section" class="hero" aria-labelledby="hero-heading">
+      <div class="container hero-inner">
+        <div class="hero-text">
+          <h1 id="hero-heading" class="hero-title">
+            Know who<br />
+            <span class="hero-accent">represents you.</span>
+          </h1>
+          <p class="hero-sub">
+            Enter your ZIP code to see every elected official —
+            from Congress to your local school board.
+          </p>
+        </div>
+
+        <div class="search-card" role="search">
+          <form id="search-form" novalidate>
+            <label for="zip-input" class="search-label">Your ZIP Code</label>
+            <div class="search-row">
+              <input
+                type="text"
+                id="zip-input"
+                name="zip"
+                class="search-input"
+                placeholder="e.g. 94103"
+                maxlength="5"
+                inputmode="numeric"
+                pattern="\d{5}"
+                autocomplete="postal-code"
+                aria-describedby="zip-hint"
+                required
+              />
+              <button type="submit" class="search-btn" aria-label="Find my representatives">
+                <span class="btn-text">Find My Representatives</span>
+                <svg class="btn-icon" aria-hidden="true" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            <p id="zip-hint" class="search-hint">
+              Works for all 50 states. Powered by ProPublica, OpenStates, and open government data.
+            </p>
+          </form>
+        </div>
+      </div>
+
+      <!-- decorative civic icons -->
+      <div class="hero-deco" aria-hidden="true">
+        <span class="deco-item deco-1">🏛️</span>
+        <span class="deco-item deco-2">🗳️</span>
+        <span class="deco-item deco-3">📋</span>
+        <span class="deco-item deco-4">🏙️</span>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         STATUS: LOADING
+    ============================================================ -->
+    <div id="loading" class="loading-wrap hidden" role="status" aria-live="polite" aria-label="Loading representatives">
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="loading-text">Looking up your representatives…</p>
+    </div>
+
+    <!-- ============================================================
+         STATUS: ERROR
+    ============================================================ -->
+    <div
+      id="error-msg"
+      class="error-banner hidden"
+      role="alert"
+      aria-live="assertive"
+    ></div>
+
+    <!-- ============================================================
+         RESULTS SECTION
+    ============================================================ -->
+    <section id="results" class="results-section hidden" aria-labelledby="results-heading">
+      <div class="container">
+
+        <div class="results-header">
+          <h2 id="results-heading" class="results-title">
+            Representatives for ZIP <strong id="zip-display"></strong>
+          </h2>
+          <a href="#" id="search-again" class="search-again-link" aria-label="Search a different ZIP code">
+            ← Search Again
+          </a>
+        </div>
+
+        <!-- Card / Map view toggle -->
+        <div class="view-toggle" role="group" aria-label="Switch display view">
+          <button id="btn-cards" class="view-btn active" aria-pressed="true">
+            <svg class="view-btn-icon" aria-hidden="true" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+            </svg>
+            Cards
+          </button>
+          <button id="btn-map" class="view-btn" aria-pressed="false">
+            <svg class="view-btn-icon" aria-hidden="true" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+            </svg>
+            Map
+          </button>
+        </div>
+
+        <!-- Level filter tabs -->
+        <div class="filter-bar" role="group" aria-label="Filter by government level">
+          <div id="level-tabs" class="tab-pills"></div>
+        </div>
+
+        <!-- Map view container (hidden by default) -->
+        <div id="map-container" class="map-container hidden" role="region" aria-label="Representatives map"></div>
+
+        <!-- Officials grid -->
+        <div id="officials-grid" class="officials-grid" aria-label="Official cards"></div>
+
+        <!-- Add official prompt -->
+        <div class="add-official-bar">
+          <p>Don't see a local official? Help us grow the dataset.</p>
+          <button id="add-official-btn" class="add-official-btn" type="button">
+            + Add a Representative
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================================================
+         LOCAL OFFICIALS SECTION
+    ============================================================ -->
+    <section id="local-officials-section" class="local-officials-section hidden" aria-label="Local officials resources">
+      <div class="container">
+        <!-- populated by UI.renderLocalOfficials() -->
+      </div>
+    </section>
+
+    <!-- ============================================================
+         ABOUT SECTION
+    ============================================================ -->
+    <section id="about" class="about-section" aria-labelledby="about-heading">
+      <div class="container about-inner">
+        <h2 id="about-heading" class="section-heading">Why LocalVotes?</h2>
+        <div class="about-grid">
+          <div class="about-card">
+            <div class="about-icon" aria-hidden="true">🏛️</div>
+            <h3>Every Level of Government</h3>
+            <p>Federal, state, county, city, and special districts — all in one place, from a single ZIP code lookup.</p>
+          </div>
+          <div class="about-card">
+            <div class="about-icon" aria-hidden="true">📊</div>
+            <h3>Voting Records</h3>
+            <p>Federal legislators include ProPublica voting-record data — party-line percentage, missed votes, and more.</p>
+          </div>
+          <div class="about-card">
+            <div class="about-icon" aria-hidden="true">💰</div>
+            <h3>Campaign Finance</h3>
+            <p>Optional FEC data surfaces how much federal and state candidates raised and spent in their last campaign.</p>
+          </div>
+          <div class="about-card">
+            <div class="about-icon" aria-hidden="true">🔒</div>
+            <h3>Your Keys, Your Privacy</h3>
+            <p>API keys live in a local <code>config.js</code> that is never committed. No server, no tracking, no ads.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================
+       SUBMIT MODAL
+  ============================================================ -->
+  <div id="submit-modal" class="modal-overlay hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div id="submit-modal-backdrop" class="modal-backdrop"></div>
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h2 id="modal-title" class="modal-title">Add a Local Official</h2>
+        <p class="modal-subtitle">Help us expand the dataset. Submissions are reviewed before being added.</p>
+        <button id="sf-close-btn" class="modal-close-btn" type="button" aria-label="Close">✕</button>
+      </div>
+
+      <form id="submit-official-form" class="submit-form" novalidate>
+        <div class="sf-row sf-row-2">
+          <div class="sf-field">
+            <label for="sf-name" class="sf-label">Full Name <span class="sf-required">*</span></label>
+            <input id="sf-name" name="sf-name" type="text" class="sf-input" placeholder="Jane Smith" required autocomplete="off">
+          </div>
+          <div class="sf-field">
+            <label for="sf-office" class="sf-label">Office / Title <span class="sf-required">*</span></label>
+            <input id="sf-office" name="sf-office" type="text" class="sf-input" placeholder="City Council Member, District 4" required>
+          </div>
+        </div>
+
+        <div class="sf-row sf-row-2">
+          <div class="sf-field">
+            <label for="sf-level" class="sf-label">Government Level</label>
+            <select id="sf-level" name="sf-level" class="sf-input">
+              <option value="">Select level…</option>
+              <option value="Federal">Federal</option>
+              <option value="State">State</option>
+              <option value="County">County</option>
+              <option value="City/Town">City / Town</option>
+              <option value="School Board">School Board</option>
+              <option value="Special District">Special District</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="sf-field">
+            <label for="sf-zip" class="sf-label">ZIP Code <span class="sf-required">*</span></label>
+            <input id="sf-zip" name="sf-zip" type="text" class="sf-input" placeholder="90210" maxlength="5" required>
+          </div>
+        </div>
+
+        <div class="sf-row sf-row-2">
+          <div class="sf-field">
+            <label for="sf-party" class="sf-label">Party Affiliation</label>
+            <input id="sf-party" name="sf-party" type="text" class="sf-input" placeholder="Democratic, Republican, Nonpartisan…">
+          </div>
+          <div class="sf-field">
+            <label for="sf-phone" class="sf-label">Phone</label>
+            <input id="sf-phone" name="sf-phone" type="tel" class="sf-input" placeholder="(555) 555-5555">
+          </div>
+        </div>
+
+        <div class="sf-row sf-row-2">
+          <div class="sf-field">
+            <label for="sf-website" class="sf-label">Official Website</label>
+            <input id="sf-website" name="sf-website" type="url" class="sf-input" placeholder="https://…">
+          </div>
+          <div class="sf-field">
+            <label for="sf-email" class="sf-label">Official Email</label>
+            <input id="sf-email" name="sf-email" type="email" class="sf-input" placeholder="official@city.gov">
+          </div>
+        </div>
+
+        <div class="sf-field">
+          <label for="sf-source" class="sf-label">Source URL <span class="sf-hint">(where did you find this info?)</span></label>
+          <input id="sf-source" name="sf-source" type="url" class="sf-input" placeholder="https://city.gov/council">
+        </div>
+
+        <div class="sf-field">
+          <label for="sf-notes" class="sf-label">Notes</label>
+          <textarea id="sf-notes" name="sf-notes" class="sf-input sf-textarea" rows="3" placeholder="Any additional context…"></textarea>
+        </div>
+
+        <div id="sf-status" class="sf-status" role="alert" aria-live="polite"></div>
+
+        <div class="sf-actions">
+          <button type="button" class="sf-cancel-btn" id="sf-cancel-btn">Cancel</button>
+          <button type="submit" class="sf-submit-btn">Submit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       FOOTER / DATA SOURCES
+  ============================================================ -->
+  <footer id="sources" class="site-footer" role="contentinfo">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-text footer-logo">LocalVotes</span>
+        <p class="footer-tagline">Open-source civic technology.</p>
+      </div>
+      <div class="footer-sources">
+        <h3 class="footer-heading">Data Sources</h3>
+        <ul class="source-list">
+          <li>
+            <a href="https://www.propublica.org/datastore/api/propublica-congress-api" target="_blank" rel="noopener noreferrer">
+              ProPublica Congress API
+            </a>
+            — federal senators &amp; House reps
+          </li>
+          <li>
+            <a href="https://openstates.org/api/v3/" target="_blank" rel="noopener noreferrer">
+              OpenStates API
+            </a>
+            — state legislators by location
+          </li>
+          <li>
+            <a href="https://api.open.fec.gov" target="_blank" rel="noopener noreferrer">
+              FEC Open Data
+            </a>
+            — federal campaign finance
+          </li>
+          <li>
+            <a href="https://api.congress.gov" target="_blank" rel="noopener noreferrer">
+              Congress.gov API
+            </a>
+            — sponsored legislation
+          </li>
+          <li>
+            <a href="https://api.zippopotam.us" target="_blank" rel="noopener noreferrer">
+              Zippopotam.us
+            </a>
+            — ZIP → coordinates
+          </li>
+          <li>
+            <a href="https://geocoding.geo.census.gov" target="_blank" rel="noopener noreferrer">
+              US Census Geocoder
+            </a>
+            — congressional district lookup
+          </li>
+        </ul>
+      </div>
+      <div class="footer-legal">
+        <h3 class="footer-heading">Legal &amp; Privacy</h3>
+        <p>
+          LocalVotes is an independent project of Twin Kites LLC and is not affiliated with,
+          endorsed by, or operated by any government agency. Display of any official's information
+          does not constitute an endorsement of that official, their party, or their positions.
+        </p>
+        <p>
+          Data is sourced from third-party APIs and may be incomplete, outdated, or inaccurate.
+          Information may not reflect recent elections, resignations, or appointments.
+          Always verify information through official government websites before acting on it.
+        </p>
+        <p>
+          This site contains links to third-party websites. Twin Kites LLC is not responsible
+          for the content, accuracy, or practices of those sites.
+        </p>
+        <p>
+          This site does not collect, store, or transmit any personal information.
+          No cookies are set. No analytics or tracking of any kind are used.
+        </p>
+        <p>
+          This service is provided "as is" without warranty of any kind, express or implied.
+          In no event shall Twin Kites LLC be liable for any direct, indirect, incidental,
+          or consequential damages arising from use of this site or reliance on information
+          presented herein.
+        </p>
+      </div>
+    </div>
+    <div class="footer-bar">
+      <div class="container">
+        <p>&copy; 2026 Twin Kites LLC &nbsp;·&nbsp; Built with open data. No tracking. No ads. &nbsp;·&nbsp; <a href="https://github.com/twinkites/localvotes" target="_blank" rel="noopener noreferrer">View on GitHub</a></p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============================================================
+       SCRIPTS — order matters
+  ============================================================ -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN2GNnU=" crossorigin=""></script>
+  <script src="config.js"></script>
+  <script src="js/geo.js"></script>
+  <script src="js/federal.js"></script>
+  <script src="js/openstates.js"></script>
+  <script src="js/fec.js"></script>
+  <script src="js/congress.js"></script>
+  <script src="js/local.js"></script>
+  <script src="js/submit.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

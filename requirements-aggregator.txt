@@ -1,0 +1,7 @@
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+
+# Optional — only needed for --use-browser (JS-rendered board pages):
+# pip install playwright && playwright install chromium
+# playwright>=1.40.0
