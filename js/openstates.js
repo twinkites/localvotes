@@ -52,7 +52,7 @@ const OpenStatesAPI = (() => {
       photoUrl: person.image || null,
       address,
       channels: [],
-      openStatesProfile: `https://openstates.org/person/${person.id}/`,
+      openStatesProfile: `https://ballotpedia.org/${encodeURIComponent(person.name.trim().replace(/\s+/g, '_'))}`,
     };
   }
 

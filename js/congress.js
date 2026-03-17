@@ -53,10 +53,37 @@ const CongressAPI = (() => {
     }
   }
 
+  async function getCommittees(bioguideId) {
+    const key = CONFIG.PROPUBLICA_API_KEY;
+    if (!key) return null;
+    try {
+      const res = await fetch(
+        `https://api.propublica.org/congress/v1/members/${bioguideId}.json`,
+        { headers: { 'X-API-Key': key } }
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      const roles = data.results?.[0]?.roles || [];
+      const current = roles.find(r => r.congress === '119') || roles[0];
+      if (!current) return null;
+      const committees = (current.committees || []).map(c => ({
+        name: c.name,
+        side: c.side,
+      }));
+      return committees.length ? committees : null;
+    } catch {
+      return null;
+    }
+  }
+
   async function enrich(official) {
     if (official.level !== 'Federal' || !official.propublicaId) return official;
-    const bills = await getSponsoredBills(official.propublicaId);
-    if (bills !== null) official.sponsoredBills = bills;
+    const [bills, committees] = await Promise.all([
+      getSponsoredBills(official.propublicaId),
+      getCommittees(official.propublicaId),
+    ]);
+    if (bills       !== null) official.sponsoredBills = bills;
+    if (committees  !== null) official.committees     = committees;
     return official;
   }
 

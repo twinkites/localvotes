@@ -80,11 +80,6 @@ const LocalOfficials = (() => {
       description: 'Comprehensive encyclopedia of U.S. politics with elected official lookup by address',
     },
     {
-      name: 'Plural Policy — Find Your Legislator',
-      url: 'https://pluralpolicy.com/find-your-legislator',
-      description: 'Location-based legislator finder with state and some local coverage',
-    },
-    {
       name: 'Common Cause',
       url: 'https://www.commoncause.org/find-your-representative/',
       description: 'Non-partisan tool for finding elected representatives at multiple levels',

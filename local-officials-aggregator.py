@@ -16,9 +16,14 @@ Usage:
   python local-officials-aggregator.py --zip 90210 10001 60601 --output results.json
   python local-officials-aggregator.py --zip 90210 --delay 3 --verbose
 
+  # Scrape all school boards for a state (50 states supported):
+  python local-officials-aggregator.py --state MA
+  python local-officials-aggregator.py --state NY --delay 3
+  python local-officials-aggregator.py --state TX --max-districts 10  # test run
+
   # For JS-rendered board pages (e.g. schools using React/Angular CMS):
   pip install playwright && playwright install chromium
-  python local-officials-aggregator.py --zip 90210 --use-browser
+  python local-officials-aggregator.py --state CA --use-browser
 """
 
 import argparse
@@ -131,6 +136,135 @@ SKIP_DOMAINS = frozenset({
 
 # Domains that are likely legitimate district/gov sites
 GOOD_TLDS = ('.org', '.net', '.edu', '.us', '.gov', '.k12')
+
+
+# ---------------------------------------------------------------------------
+# State configuration: FIPS codes, bounding boxes, and terminology overrides
+# ---------------------------------------------------------------------------
+
+# Maps state abbreviation → {fips, bbox, extra_titles, extra_slugs, nav_keywords}
+# bbox format: 'minLon,minLat,maxLon,maxLat' (WGS-84)
+STATE_CONFIG: dict[str, dict] = {
+    'AL': {'fips': '01', 'bbox': '-88.4731,30.2245,-84.8882,35.0081'},
+    'AK': {'fips': '02', 'bbox': '-179.1506,51.2097,-129.9824,71.5388'},
+    'AZ': {'fips': '04', 'bbox': '-114.8183,31.3322,-109.0452,37.0042'},
+    'AR': {'fips': '05', 'bbox': '-94.6178,33.0041,-89.6442,36.4997'},
+    'CA': {'fips': '06', 'bbox': '-124.4096,32.5343,-114.1312,42.0095'},
+    'CO': {'fips': '08', 'bbox': '-109.0603,36.9931,-102.0424,41.0034'},
+    'CT': {'fips': '09', 'bbox': '-73.7278,40.9870,-71.7870,42.0505'},
+    'DE': {'fips': '10', 'bbox': '-75.7890,38.4510,-75.0480,39.8390'},
+    'DC': {'fips': '11', 'bbox': '-77.1198,38.7916,-76.9094,38.9955'},
+    'FL': {'fips': '12', 'bbox': '-87.6349,24.3963,-79.9743,31.0007'},
+    'GA': {'fips': '13', 'bbox': '-85.6052,30.3575,-80.7514,35.0008'},
+    'HI': {'fips': '15', 'bbox': '-160.2471,18.9106,-154.8069,22.2356'},
+    'ID': {'fips': '16', 'bbox': '-117.2431,41.9880,-111.0435,49.0011'},
+    'IL': {'fips': '17', 'bbox': '-91.5131,36.9703,-87.0199,42.5083'},
+    'IN': {'fips': '18', 'bbox': '-88.0998,37.7717,-84.7845,41.7607'},
+    'IA': {'fips': '19', 'bbox': '-96.6397,40.3754,-90.1401,43.5012'},
+    'KS': {'fips': '20', 'bbox': '-102.0517,36.9931,-94.5883,40.0031'},
+    'KY': {'fips': '21', 'bbox': '-89.5715,36.4973,-81.9647,39.1474'},
+    'LA': {'fips': '22', 'bbox': '-94.0432,28.9271,-88.7578,33.0191'},
+    'ME': {'fips': '23', 'bbox': '-71.0837,42.9774,-66.9499,47.4597'},
+    'MD': {'fips': '24', 'bbox': '-79.4877,37.9116,-74.9860,39.7228'},
+    'MA': {
+        'fips': '25', 'bbox': '-73.5087,41.2373,-69.9281,42.8867',
+        'extra_titles': frozenset({
+            'school committee', 'committee member',
+            'vice chair', 'vice-chair', 'chair emeritus',
+            'student representative', 'student member',
+        }),
+        'extra_slugs': [
+            '/school-committee', '/school-committee-members',
+            '/about/school-committee', '/about-us/school-committee',
+            '/district/school-committee', '/our-district/school-committee',
+            '/community/school-committee', '/school-committee/members',
+            '/school-committee/meet-the-committee', '/sc',
+        ],
+        'nav_keywords': (
+            'school committee', 'committee members', 'meet the committee',
+            'board of education', 'school board', 'board members', 'trustees',
+        ),
+    },
+    'MI': {'fips': '26', 'bbox': '-90.4182,41.6961,-82.1220,48.3063'},
+    'MN': {'fips': '27', 'bbox': '-97.2390,43.4994,-89.4898,49.3845'},
+    'MS': {'fips': '28', 'bbox': '-91.6550,30.1730,-88.0983,35.0081'},
+    'MO': {'fips': '29', 'bbox': '-95.7748,35.9956,-89.0990,40.6135'},
+    'MT': {'fips': '30', 'bbox': '-116.0491,44.3582,-104.0400,49.0011'},
+    'NE': {'fips': '31', 'bbox': '-104.0533,39.9999,-95.3083,43.0012'},
+    'NV': {'fips': '32', 'bbox': '-120.0059,35.0018,-114.0418,42.0002'},
+    'NH': {'fips': '33', 'bbox': '-72.5573,42.6970,-70.6101,45.3058'},
+    'NJ': {'fips': '34', 'bbox': '-75.5596,38.9285,-73.8948,41.3574'},
+    'NM': {'fips': '35', 'bbox': '-109.0502,31.3322,-103.0022,37.0001'},
+    'NY': {'fips': '36', 'bbox': '-79.7624,40.4960,-71.8562,45.0158'},
+    'NC': {'fips': '37', 'bbox': '-84.3219,33.8428,-75.4601,36.5881'},
+    'ND': {'fips': '38', 'bbox': '-104.0489,45.9350,-96.5543,49.0011'},
+    'OH': {'fips': '39', 'bbox': '-84.8203,38.4033,-80.5189,41.9773'},
+    'OK': {'fips': '40', 'bbox': '-103.0025,33.6153,-94.4307,37.0021'},
+    'OR': {'fips': '41', 'bbox': '-124.5663,41.9917,-116.4635,46.2323'},
+    'PA': {'fips': '42', 'bbox': '-80.5197,39.7198,-74.6895,42.2699'},
+    'RI': {'fips': '44', 'bbox': '-71.9073,41.0958,-71.0886,42.0189'},
+    'SC': {'fips': '45', 'bbox': '-83.3535,32.0333,-78.5418,35.2155'},
+    'SD': {'fips': '46', 'bbox': '-104.0579,42.4797,-96.4368,45.9451'},
+    'TN': {'fips': '47', 'bbox': '-90.3102,34.9828,-81.6469,36.6781'},
+    'TX': {'fips': '48', 'bbox': '-106.6456,25.8371,-93.5083,36.5007'},
+    'UT': {'fips': '49', 'bbox': '-114.0529,36.9979,-109.0416,42.0017'},
+    'VT': {'fips': '50', 'bbox': '-73.4379,42.7270,-71.4653,45.0158'},
+    'VA': {'fips': '51', 'bbox': '-83.6754,36.5407,-75.1665,39.4660'},
+    'WA': {'fips': '53', 'bbox': '-124.7631,45.5435,-116.9160,49.0025'},
+    'WV': {'fips': '54', 'bbox': '-82.6447,37.2015,-77.7193,40.6386'},
+    'WI': {'fips': '55', 'bbox': '-92.8893,42.4919,-86.2499,47.0809'},
+    'WY': {'fips': '56', 'bbox': '-111.0545,40.9948,-104.0522,45.0059'},
+}
+
+# Generic suffix pattern — handles the most common district naming conventions
+_DISTRICT_SUFFIX_RE = re.compile(
+    r'\s*(?:regional\s+)?(?:unified\s+|independent\s+|community\s+|city\s+|'
+    r'central\s+|common\s+|joint\s+|cooperative\s+)?'
+    r'(?:school\s+(?:district|committee|department|union|board)|'
+    r'(?:elementary|secondary|high)\s+school\s+district|'
+    r'public\s+schools?|schools?|board\s+of\s+education)\s*$',
+    re.IGNORECASE,
+)
+
+_DISTRICT_PREFIX_RE = re.compile(
+    r'^(?:greater|north\s+shore|south\s+shore|cape\s+cod|pioneer\s+valley|'
+    r'central|eastern|western|northern|southern)\s+',
+    re.IGNORECASE,
+)
+
+
+def _extract_state_cities(district_name: str) -> list[str]:
+    """Extract candidate city/town names from a school district name.
+
+    Works generically for all states: strips common district-type suffixes
+    and geographic prefixes, then splits on hyphens/slashes for multi-city
+    districts.
+
+    Examples:
+      "Amherst School District"              → ["Amherst"]
+      "Amherst-Pelham Regional School Dist"  → ["Amherst", "Pelham"]
+      "Los Angeles Unified School District"  → ["Los Angeles"]
+      "Greater Lawrence Technical School"    → ["Lawrence"]
+    """
+    name = _DISTRICT_SUFFIX_RE.sub('', district_name).strip()
+    name = re.sub(r'\s+(?:Technical|Vocational|Cooperative|Regional)\s*$', '', name, flags=re.I).strip()
+    parts = [p.strip() for p in re.split(r'[-/]', name)]
+    cities = []
+    for part in parts:
+        part = _DISTRICT_PREFIX_RE.sub('', part).strip()
+        if part and len(part) >= 2:
+            cities.append(part)
+    return cities
+
+
+def _get_state_title_re(state_abbr: str) -> re.Pattern:
+    """Returns a compiled regex matching board member titles for the given state."""
+    cfg = STATE_CONFIG.get(state_abbr.upper(), {})
+    titles = BOARD_TITLES | cfg.get('extra_titles', frozenset())
+    return re.compile(
+        r'\b(' + '|'.join(re.escape(t) for t in titles) + r')\b',
+        re.IGNORECASE,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -727,6 +861,7 @@ class OfficialsAggregator:
             self.browser.close()
 
     def process_zips(self, zip_codes: list[str]) -> list[dict]:
+
         results = []
         for i, zip_code in enumerate(zip_codes):
             logger.info(f'━━━ ZIP {zip_code}  ({i + 1}/{len(zip_codes)}) ━━━')
@@ -744,24 +879,334 @@ class OfficialsAggregator:
 
 
 # ---------------------------------------------------------------------------
+# Massachusetts statewide school committee pipeline
+# ---------------------------------------------------------------------------
+
+class StateDistrictFetcher:
+    """
+    Fetches all K-12 school districts for a given state from Census TIGERweb
+    using a statewide bounding box query.
+
+    TIGERweb layers: 14 = Unified, 16 = Secondary, 18 = Elementary.
+    Paginates automatically if the server sets exceededTransferLimit.
+    """
+
+    TIGERWEB = (
+        'https://tigerweb.geo.census.gov/arcgis/rest/services/'
+        'TIGERweb/tigerWMS_Current/MapServer/{layer}/query'
+    )
+    LAYERS = [14, 16, 18]
+
+    def __init__(self, state_abbr: str, session: requests.Session):
+        cfg = STATE_CONFIG.get(state_abbr.upper())
+        if not cfg:
+            raise ValueError(f'Unsupported state: {state_abbr}')
+        self.state_abbr = state_abbr.upper()
+        self.fips = cfg['fips']
+        self.bbox = cfg['bbox']
+        self.session = session
+
+    def fetch_all(self) -> list[dict]:
+        seen_geoids: set[str] = set()
+        all_districts: list[dict] = []
+
+        for layer in self.LAYERS:
+            offset = 0
+            while True:
+                try:
+                    r = self.session.get(
+                        self.TIGERWEB.format(layer=layer),
+                        params={
+                            'geometry': self.bbox,
+                            'geometryType': 'esriGeometryEnvelope',
+                            'inSR': '4326',
+                            'spatialRel': 'esriSpatialRelIntersects',
+                            'where': f"GEOID LIKE '{self.fips}%'",
+                            'outFields': 'NAME,GEOID',
+                            'returnGeometry': 'false',
+                            'resultRecordCount': 1000,
+                            'resultOffset': offset,
+                            'f': 'json',
+                        },
+                        timeout=20,
+                    )
+                    r.raise_for_status()
+                    data = r.json()
+                except Exception as e:
+                    logger.warning(f'TIGERweb {self.state_abbr} layer {layer} offset {offset}: {e}')
+                    break
+
+                features = data.get('features', [])
+                if not features:
+                    break
+
+                new_count = 0
+                for feat in features:
+                    attr = feat.get('attributes', {})
+                    geoid = attr.get('GEOID', '')
+                    if not geoid.startswith(self.fips) or geoid in seen_geoids:
+                        continue
+                    seen_geoids.add(geoid)
+                    all_districts.append({
+                        'name': attr.get('NAME', '').strip(),
+                        'geoid': geoid,
+                        'layer': layer,
+                    })
+                    new_count += 1
+
+                logger.info(f'TIGERweb layer {layer} offset {offset}: {new_count} new {self.state_abbr} districts')
+
+                if not data.get('exceededTransferLimit'):
+                    break
+                offset += len(features)
+
+        logger.info(f'Total {self.state_abbr} school districts: {len(all_districts)}')
+        return all_districts
+
+
+class StateBoardPageFinder(BoardPageFinder):
+    """
+    Board page finder parameterized by state configuration.
+    Probes state-specific slugs first, then falls back to generic slugs.
+    """
+
+    _DEFAULT_NAV_KEYWORDS = (
+        'board of education', 'school board', 'board members',
+        'trustees', 'governing board', 'school committee',
+    )
+
+    def __init__(self, state_abbr: str, session: requests.Session, delay: float):
+        super().__init__(session, delay)
+        cfg = STATE_CONFIG.get(state_abbr.upper(), {})
+        self._extra_slugs: list[str] = cfg.get('extra_slugs', [])
+        self._nav_keywords: tuple = cfg.get('nav_keywords', self._DEFAULT_NAV_KEYWORDS)
+
+    def find(self, base_url: str) -> Optional[str]:
+        for slug in self._extra_slugs + BOARD_PAGE_SLUGS:
+            url = base_url.rstrip('/') + slug
+            time.sleep(self.delay * 0.25)
+            try:
+                r = self.session.get(url, timeout=10, allow_redirects=True)
+                if r.status_code == 200 and len(r.text) > 1000:
+                    snippet = r.text[:5000].lower()
+                    if any(kw in snippet for kw in ('committee', 'board', 'trustee', 'member', 'president')):
+                        logger.info(f'Board page via slug: {r.url}')
+                        return r.url
+            except Exception:
+                continue
+        return self._find_in_nav(base_url)
+
+    def _find_in_nav(self, base_url: str) -> Optional[str]:
+        logger.info(f'Scanning nav for board link: {base_url}')
+        try:
+            time.sleep(self.delay * 0.5)
+            r = self.session.get(base_url, timeout=12)
+            if r.status_code != 200:
+                return None
+            soup = BeautifulSoup(r.text, 'lxml')
+            for a in soup.find_all('a', href=True):
+                text = a.get_text(strip=True).lower()
+                if any(kw in text for kw in self._nav_keywords):
+                    href = a['href']
+                    full = href if href.startswith('http') else urljoin(base_url, href)
+                    logger.info(f'Board page via nav: {full}')
+                    return full
+        except Exception as e:
+            logger.warning(f'Nav scan failed on {base_url}: {e}')
+        return None
+
+
+class StateSchoolBoardAggregator:
+    """
+    Statewide school board/committee data pipeline for any supported state.
+
+    1. Fetches all school districts for the given state from Census TIGERweb.
+    2. For each district: finds the website, finds the board page,
+       and parses board member names/titles.
+    3. Outputs city-indexed JSON to data/{state_lower}_school_boards.json.
+
+    Run with:
+      python local-officials-aggregator.py --state MA
+      python local-officials-aggregator.py --state NY --delay 3
+      python local-officials-aggregator.py --state TX --max-districts 10   # test run
+    """
+
+    def __init__(self, state_abbr: str, rate_limit_delay: float = 2.0,
+                 use_browser: bool = False, max_districts: Optional[int] = None):
+        state_abbr = state_abbr.upper()
+        if state_abbr not in STATE_CONFIG:
+            raise ValueError(
+                f'Unsupported state: {state_abbr}. '
+                f'Supported: {", ".join(sorted(STATE_CONFIG))}'
+            )
+        self.state_abbr = state_abbr
+        self.delay = rate_limit_delay
+        self.max_districts = max_districts
+        self.session = make_session()
+        self.district_fetcher = StateDistrictFetcher(state_abbr, self.session)
+        self.website_finder = WebsiteFinder(self.session, rate_limit_delay)
+        self.board_finder = StateBoardPageFinder(state_abbr, self.session, rate_limit_delay)
+        self.parser = BoardPageParser()
+        self.browser: Optional[BrowserFetcher] = BrowserFetcher() if use_browser else None
+        self._title_re = _get_state_title_re(state_abbr)
+
+    def default_output_path(self) -> str:
+        return f'data/{self.state_abbr.lower()}_school_boards.json'
+
+    def run(self, output_path: Optional[str] = None):
+        import os
+        if output_path is None:
+            output_path = self.default_output_path()
+        os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
+
+        logger.info(f'Fetching all {self.state_abbr} school districts from TIGERweb...')
+        raw_districts = self.district_fetcher.fetch_all()
+
+        if self.max_districts:
+            raw_districts = raw_districts[:self.max_districts]
+            logger.info(f'Capped at {self.max_districts} districts (--max-districts)')
+
+        districts_out: list[dict] = []
+        city_index: dict[str, list[int]] = {}
+
+        for i, raw in enumerate(raw_districts):
+            name = raw['name']
+            geoid = raw['geoid']
+            idx = len(districts_out)
+
+            logger.info(f'[{i + 1}/{len(raw_districts)}] {name}')
+
+            district_info = DistrictInfo(
+                leaid=geoid, name=name, city='', state=self.state_abbr,
+                phone=None, website=None, zip_code='',
+            )
+
+            time.sleep(self.delay)
+            website = self.website_finder.find(district_info)
+
+            district_entry: dict = {
+                'name': name,
+                'geoid': geoid,
+                'website': website,
+                'board_page': None,
+                'members': [],
+            }
+
+            if not website:
+                logger.warning(f'No website for {name}')
+                districts_out.append(district_entry)
+                self._index(name, idx, city_index)
+                continue
+
+            time.sleep(self.delay)
+            board_page = self.board_finder.find(website)
+            district_entry['board_page'] = board_page
+
+            if not board_page:
+                logger.warning(f'No board page at {website}')
+                districts_out.append(district_entry)
+                self._index(name, idx, city_index)
+                continue
+
+            time.sleep(self.delay)
+            try:
+                html = self.session.get(board_page, timeout=15).text
+                if self.browser and not self._title_re.search(
+                    BeautifulSoup(html, 'lxml').get_text()
+                ):
+                    logger.info(f'Retrying with browser: {board_page}')
+                    html = self.browser.fetch(board_page)
+
+                officials = self.parser.parse(html, board_page, district_info)
+                district_entry['members'] = [
+                    {
+                        'name': o.name,
+                        'title': o.title,
+                        'contact_email': o.contact_email,
+                    }
+                    for o in officials
+                ]
+                logger.info(f'✓ {name}: {len(officials)} member(s)')
+            except Exception as e:
+                logger.error(f'Parse error for {board_page}: {e}')
+
+            districts_out.append(district_entry)
+            self._index(name, idx, city_index)
+
+            # Checkpoint every 50 districts so progress isn't lost
+            if (i + 1) % 50 == 0:
+                self._save(districts_out, city_index, output_path, partial=True)
+
+        self._save(districts_out, city_index, output_path, partial=False)
+
+        total_members = sum(len(d['members']) for d in districts_out)
+        no_members = sum(1 for d in districts_out if not d['members'])
+        logger.info(
+            f'Done — {len(districts_out)} districts, {total_members} members found, '
+            f'{no_members} districts with no members parsed'
+        )
+
+    def _index(self, district_name: str, idx: int, city_index: dict):
+        for city in _extract_state_cities(district_name):
+            key = city.lower()
+            city_index.setdefault(key, [])
+            if idx not in city_index[key]:
+                city_index[key].append(idx)
+
+    def _save(self, districts: list, city_index: dict, path: str, partial: bool = False):
+        payload = {
+            'generated': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+            'state': self.state_abbr,
+            'partial': partial,
+            'districts': districts,
+            'city_index': city_index,
+        }
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+        status = '(partial checkpoint)' if partial else ''
+        logger.info(f'Saved → {path} {status}')
+
+    def close(self):
+        if self.browser:
+            self.browser.close()
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
 def main():
+    supported_states = ', '.join(sorted(STATE_CONFIG))
     ap = argparse.ArgumentParser(
-        description='Scrape school board member data by ZIP code (free sources only).',
+        description='Scrape school board / school committee member data (free sources only).',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog=f"""
 examples:
   python local-officials-aggregator.py --zip 90210
   python local-officials-aggregator.py --zip 90210 10001 60601 --output results.json
   python local-officials-aggregator.py --zip 90210 --delay 3 --verbose
+
+  # Scrape all school boards for a state:
+  python local-officials-aggregator.py --state MA
+  python local-officials-aggregator.py --state NY --delay 3
+  python local-officials-aggregator.py --state TX --max-districts 10   # test run
+  python local-officials-aggregator.py --state CA --output data/ca_school_boards.json
+
+supported states: {supported_states}
         """,
     )
-    ap.add_argument('--zip', nargs='+', required=True, metavar='ZIPCODE',
+    ap.add_argument('--zip', nargs='+', metavar='ZIPCODE',
                     help='One or more 5-digit ZIP codes to process')
-    ap.add_argument('--output', default='officials_output.json',
-                    help='Output JSON file path (default: officials_output.json)')
+    ap.add_argument('--state', metavar='XX',
+                    help='Scrape all school boards for a state (e.g. MA, NY, CA). '
+                         'Outputs to data/{state}_school_boards.json (or --output path).')
+    ap.add_argument('--ma', action='store_true',
+                    help='Alias for --state MA (backward compatibility)')
+    ap.add_argument('--max-districts', type=int, default=None, metavar='N',
+                    help='Limit --state scrape to first N districts (useful for testing)')
+    ap.add_argument('--output', default=None,
+                    help='Output JSON file path (defaults: officials_output.json for --zip, '
+                         'data/{state}_school_boards.json for --state)')
     ap.add_argument('--delay', type=float, default=2.0,
                     help='Seconds between requests — be polite (default: 2.0)')
     ap.add_argument('--verbose', action='store_true',
@@ -777,9 +1222,11 @@ examples:
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    bad_zips = [z for z in args.zip if not re.match(r'^\d{5}$', z)]
-    if bad_zips:
-        ap.error(f'Invalid ZIP code(s): {", ".join(bad_zips)}')
+    # --ma is a backward-compatible alias for --state MA
+    state = args.state or ('MA' if args.ma else None)
+
+    if not state and not args.zip:
+        ap.error('One of --zip, --state XX, or --ma is required.')
 
     if args.use_browser and not PLAYWRIGHT_AVAILABLE:
         ap.error(
@@ -788,13 +1235,37 @@ examples:
             '  playwright install chromium'
         )
 
+    # ── Statewide school board scrape ────────────────────────────────────────
+    if state:
+        state = state.upper()
+        if state not in STATE_CONFIG:
+            ap.error(f'Unknown state "{state}". Supported: {supported_states}')
+        agg = StateSchoolBoardAggregator(
+            state_abbr=state,
+            rate_limit_delay=args.delay,
+            use_browser=args.use_browser,
+            max_districts=args.max_districts,
+        )
+        try:
+            agg.run(args.output)
+        finally:
+            agg.close()
+        return
+
+    # ── Per-ZIP scrape ───────────────────────────────────────────────────────
+    output = args.output or 'officials_output.json'
+
+    bad_zips = [z for z in args.zip if not re.match(r'^\d{5}$', z)]
+    if bad_zips:
+        ap.error(f'Invalid ZIP code(s): {", ".join(bad_zips)}')
+
     aggregator = OfficialsAggregator(
         rate_limit_delay=args.delay,
         use_browser=args.use_browser,
     )
     try:
         results = aggregator.process_zips(args.zip)
-        aggregator.save(results, args.output)
+        aggregator.save(results, output)
     finally:
         aggregator.close()
 
@@ -805,7 +1276,7 @@ examples:
     print(f'  ZIPs processed : {len(results)}')
     print(f'  Officials found: {total_officials}')
     print(f'  Need follow-up : {total_not_found} district(s)')
-    print(f'  Output         : {args.output}')
+    print(f'  Output         : {output}')
     print(f'{"─" * 50}')
 
     if total_not_found:

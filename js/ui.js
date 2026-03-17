@@ -126,8 +126,8 @@ const UI = (() => {
     if (!url) return '';
     return `
       <div class="detail-section">
-        <h4>State Legislature Profile <span class="source-badge">OpenStates</span></h4>
-        <a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" class="detail-link">View full profile, bills &amp; votes →</a>
+        <h4>Ballotpedia Profile <span class="source-badge">Ballotpedia</span></h4>
+        <a href="${safeUrl(url)}" target="_blank" rel="noopener noreferrer" class="detail-link">View full profile, votes &amp; election history →</a>
       </div>`;
   }
 
@@ -148,11 +148,26 @@ const UI = (() => {
       </div>`;
   }
 
+  function renderCommittees(committees) {
+    if (!committees?.length) return '';
+    return `
+      <div class="detail-section">
+        <h4>Committee Assignments <span class="source-badge">ProPublica</span></h4>
+        <ul class="committee-list">
+          ${committees.map(c => `
+            <li class="committee-item">
+              <span class="committee-name">${esc(c.name)}</span>
+              ${c.side ? `<span class="committee-side ${esc(c.side)}">${esc(c.side)}</span>` : ''}
+            </li>`).join('')}
+        </ul>
+      </div>`;
+  }
+
   function renderOfficialCard(official) {
     const partyColor = getPartyColor(official.party);
     const levelColor = LEVEL_COLORS[official.level] || '#1a202c';
     const hasDetails = official.votingRecord || official.campaignFinance
-      || official.sponsoredBills || official.openStatesProfile;
+      || official.sponsoredBills || official.openStatesProfile || official.committees;
     const cardId = `official-${Math.random().toString(36).slice(2)}`;
 
     const addressStr = official.address[0]
@@ -188,6 +203,7 @@ const UI = (() => {
           ${official.urls.length ? `<div class="contact-item">🌐 <a href="${safeUrl(official.urls[0])}" target="_blank" rel="noopener noreferrer">Official Website</a></div>` : ''}
           ${addressStr ? `<div class="contact-item">📍 ${addressStr}</div>` : ''}
           ${renderChannels(official.channels)}
+          <div class="contact-item news-link-item">📰 <a href="https://duckduckgo.com/?q=%22${encodeURIComponent(official.name)}%22&ia=news&iax=news" target="_blank" rel="noopener noreferrer">Recent news</a></div>
         </div>
 
         ${hasDetails ? `
@@ -196,6 +212,7 @@ const UI = (() => {
           </button>
           <div id="${cardId}" class="card-details hidden">
             ${renderVotingRecord(official.votingRecord)}
+            ${renderCommittees(official.committees)}
             ${renderSponsoredBills(official.sponsoredBills)}
             ${renderCampaignFinance(official.campaignFinance)}
             ${renderOpenStatesProfile(official.openStatesProfile)}
@@ -345,8 +362,77 @@ const UI = (() => {
     document.getElementById('officials-grid').innerHTML = '';
     const local = document.getElementById('local-officials-section');
     if (local) { local.classList.add('hidden'); local.innerHTML = ''; }
+    const panel = document.getElementById('district-panel');
+    if (panel) { panel.classList.add('hidden'); panel.innerHTML = ''; }
+    const tools = document.getElementById('civic-tools');
+    if (tools) { tools.classList.add('hidden'); tools.innerHTML = ''; }
     hideError();
   }
 
-  return { renderResults, renderLocalOfficials, filterByLevel, toggleDetails, showLoading, showError, hideError, reset };
+  function renderDistrictPanel(geo) {
+    const panel = document.getElementById('district-panel');
+    if (!panel) return;
+
+    const chips = [];
+
+    if (geo.congressionalDistrict) {
+      const num = parseInt(geo.congressionalDistrict, 10);
+      const label = num === 0
+        ? `${geo.stateAbbr} At-Large`
+        : `${geo.stateAbbr}-${num}`;
+      chips.push(`<span class="district-chip cd-chip" title="Congressional District">🏛️ ${esc(label)}</span>`);
+    }
+
+    if (geo.county) {
+      const name = geo.county.toLowerCase().includes('county')
+        ? geo.county
+        : `${geo.county} County`;
+      chips.push(`<span class="district-chip county-chip" title="County">📋 ${esc(name)}</span>`);
+    }
+
+    if (!chips.length) { panel.classList.add('hidden'); return; }
+
+    panel.innerHTML = `<div class="district-panel-inner">
+      <span class="district-panel-label">You are in</span>
+      ${chips.join('')}
+    </div>`;
+    panel.classList.remove('hidden');
+  }
+
+  function renderCivicTools(geo) {
+    const section = document.getElementById('civic-tools');
+    if (!section) return;
+    const links = CivicLinks.get(geo.stateAbbr);
+    section.innerHTML = `
+      <div class="civic-tools-inner">
+        <h3 class="civic-tools-title">Take Action</h3>
+        <div class="civic-tools-grid">
+          <a href="${safeUrl(links.registerUrl)}" target="_blank" rel="noopener noreferrer" class="civic-tool-card">
+            <span class="civic-tool-icon" aria-hidden="true">🗳️</span>
+            <div class="civic-tool-body">
+              <strong>Register to Vote</strong>
+              <span>${esc(geo.state)} official portal</span>
+            </div>
+          </a>
+          <a href="${safeUrl(links.pollUrl)}" target="_blank" rel="noopener noreferrer" class="civic-tool-card">
+            <span class="civic-tool-icon" aria-hidden="true">📍</span>
+            <div class="civic-tool-body">
+              <strong>Find Your Polling Place</strong>
+              <span>${esc(geo.state)} official lookup</span>
+            </div>
+          </a>
+          <div class="civic-tool-card civic-tool-election">
+            <span class="civic-tool-icon" aria-hidden="true">🗓️</span>
+            <div class="civic-tool-body">
+              <strong>${esc(links.election.label)}</strong>
+              <span>${esc(links.election.date)}</span>
+              <span class="civic-tool-detail">${esc(links.election.detail)}</span>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    section.classList.remove('hidden');
+  }
+
+  return { renderResults, renderLocalOfficials, renderDistrictPanel, renderCivicTools, filterByLevel, toggleDetails, showLoading, showError, hideError, reset };
 })();

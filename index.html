@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="LocalVotes — Look up every elected official representing your ZIP code, from Congress to your local school board." />
+  <meta property="og:type"        content="website" />
+  <meta property="og:title"       content="LocalVotes — Know Who Represents You" />
+  <meta property="og:description" content="Look up every elected official from your ZIP code — Congress, state legislature, governor, school board, and more." />
+  <meta property="og:url"         content="https://twinkites.github.io/localvotes/" />
+  <meta name="twitter:card"        content="summary" />
+  <meta name="twitter:title"       content="LocalVotes — Know Who Represents You" />
+  <meta name="twitter:description" content="Look up every elected official from your ZIP code — Congress, state legislature, governor, school board, and more." />
   <meta name="theme-color" content="#1a56db" />
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'none';
@@ -17,6 +24,8 @@
                 https://api.congress.gov
                 https://geocoding.geo.census.gov
                 https://tigerweb.geo.census.gov
+                https://nominatim.openstreetmap.org
+                https://query.wikidata.org
                 https://docs.google.com;
     img-src     'self' data: https:;
     font-src    'self';
@@ -105,10 +114,28 @@
                 </svg>
               </button>
             </div>
+            <div class="geo-row">
+              <button type="button" id="geo-btn" class="geo-btn">
+                <span aria-hidden="true">📍</span> Use my location
+              </button>
+            </div>
             <p id="zip-hint" class="search-hint">
               Works for all 50 states. Powered by ProPublica, OpenStates, and open government data.
             </p>
           </form>
+
+          <!-- Location status — shown only after geolocation is used -->
+          <div id="location-status" class="location-status hidden" role="status" aria-live="polite">
+            <span class="location-icon" aria-hidden="true">📍</span>
+            <span id="location-label" class="location-label"></span>
+            <span class="location-privacy">Coordinates are held in browser memory only — never saved or sent to our servers.</span>
+            <button
+              type="button"
+              id="delete-location-btn"
+              class="delete-location-btn"
+              title="Removes your coordinates from browser memory. Nothing was ever written to disk, localStorage, or any server."
+            >Delete location data</button>
+          </div>
         </div>
       </div>
 
@@ -149,10 +176,15 @@
           <h2 id="results-heading" class="results-title">
             Representatives for ZIP <strong id="zip-display"></strong>
           </h2>
-          <a href="#" id="search-again" class="search-again-link" aria-label="Search a different ZIP code">
-            ← Search Again
-          </a>
+          <div class="results-header-actions">
+            <button type="button" id="share-btn" class="results-action-btn">Share</button>
+            <button type="button" id="print-btn" class="results-action-btn">Print</button>
+            <a href="#" id="search-again" class="search-again-link" aria-label="Search a different ZIP code">← Search Again</a>
+          </div>
         </div>
+
+        <!-- District context panel — populated by UI.renderDistrictPanel() -->
+        <div id="district-panel" class="district-panel hidden" aria-label="Your districts"></div>
 
         <!-- Card / Map view toggle -->
         <div class="view-toggle" role="group" aria-label="Switch display view">
@@ -180,6 +212,9 @@
 
         <!-- Officials grid -->
         <div id="officials-grid" class="officials-grid" aria-label="Official cards"></div>
+
+        <!-- Civic action tools — populated by UI.renderCivicTools() -->
+        <div id="civic-tools" class="civic-tools hidden" aria-label="Civic action tools"></div>
 
         <!-- Add official prompt -->
         <div class="add-official-bar">
@@ -336,13 +371,37 @@
             <a href="https://www.propublica.org/datastore/api/propublica-congress-api" target="_blank" rel="noopener noreferrer">
               ProPublica Congress API
             </a>
-            — federal senators &amp; House reps
+            — federal senators &amp; House reps, voting records, committees
           </li>
           <li>
             <a href="https://openstates.org/api/v3/" target="_blank" rel="noopener noreferrer">
               OpenStates API
             </a>
             — state legislators by location
+          </li>
+          <li>
+            <a href="https://query.wikidata.org" target="_blank" rel="noopener noreferrer">
+              Wikidata SPARQL
+            </a>
+            — statewide executives (Governor, AG, and more)
+          </li>
+          <li>
+            <a href="https://geocoding.geo.census.gov" target="_blank" rel="noopener noreferrer">
+              US Census Geocoder
+            </a>
+            — congressional district lookup &amp; reverse geocoding
+          </li>
+          <li>
+            <a href="https://tigerweb.geo.census.gov" target="_blank" rel="noopener noreferrer">
+              Census TIGERweb
+            </a>
+            — district boundaries, school district &amp; county lookup
+          </li>
+          <li>
+            <a href="https://nominatim.openstreetmap.org" target="_blank" rel="noopener noreferrer">
+              Nominatim (OpenStreetMap)
+            </a>
+            — reverse geocoding fallback
           </li>
           <li>
             <a href="https://api.open.fec.gov" target="_blank" rel="noopener noreferrer">
@@ -361,12 +420,6 @@
               Zippopotam.us
             </a>
             — ZIP → coordinates
-          </li>
-          <li>
-            <a href="https://geocoding.geo.census.gov" target="_blank" rel="noopener noreferrer">
-              US Census Geocoder
-            </a>
-            — congressional district lookup
           </li>
         </ul>
       </div>
@@ -419,6 +472,9 @@
   <script src="js/local.js"></script>
   <script src="js/submit.js"></script>
   <script src="js/map.js"></script>
+  <script src="js/civic-links.js"></script>
+  <script src="js/statewide.js"></script>
+  <script src="js/school-boards.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/app.js"></script>
 </body>

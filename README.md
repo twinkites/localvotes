@@ -2,37 +2,31 @@
 
 **Know who represents you.**
 
-LocalVotes is a fully static, client-side web app that looks up every elected official for any US ZIP code — from US Senators down to state legislators. For city councils, school boards, and special districts (which have no free API), it generates targeted search links and curated resources. No server required. No tracking. No ads.
+LocalVotes is a fully static, client-side web app that looks up every elected official for any US ZIP code — from US Senators down to your local school board. No server required. No tracking. No ads.
 
-We want to provide information to all voters. A project of Twin Kites LLC. 
-
-Always available and sharable at: https://twinkites.github.io/localvotes
+A project of Twin Kites LLC.
+Always available at: https://twinkites.github.io/localvotes
 
 ---
 
 ## What it does
 
-- Enter a 5-digit ZIP code and see elected officials at the Federal and State levels.
-
+- Enter a 5-digit ZIP code (or click **Use my location**) to see every elected official at the Federal, State, and local levels.
+- **Federal:** US Senators and House Representatives via ProPublica, with voting-record stats, sponsored legislation, and committee memberships.
+- **State executives:** Governor, Lieutenant Governor, Attorney General, Secretary of State, Treasurer, Comptroller, and Auditor via Wikidata.
+- **State legislators:** State Senate and House members via OpenStates.
+- **School board:** For states with pre-built data (run the scraper), members are shown directly. See [School board data](#school-board-data).
 - Filter results by government level using the pill tabs.
-
-- Each official card shows name, office, party affiliation, phone, email, official website, and social media links.
-
-- Federal legislators show ProPublica voting-record stats (party-line %, missed votes) and Congress.gov sponsored legislation when API keys are configured.
-
-- State legislators include a direct link to their OpenStates profile (bills, votes, full bio).
-
-- FEC campaign finance data (total raised/spent) is shown when available.
-
-- A "Local Officials" section generates pre-filled search links for city council, school board, county government, sheriff, and special districts, plus links to verified national civic resources.
-
+- **Map view:** Toggle to a Leaflet map showing official locations with congressional district and school district boundary overlays.
+- **District panel:** Shows your congressional district and county at a glance (e.g. "NY-12 · Albany County").
+- **Civic tools:** Direct links to your state's voter registration portal, polling place finder, and next election info.
+- Federal legislators show ProPublica voting stats (party-line %, missed votes), FEC campaign finance totals, committee memberships, and Congress.gov sponsored legislation.
+- Each card includes a DuckDuckGo news link for recent coverage of that official.
+- Share button (native share on mobile, clipboard fallback on desktop) and Print button.
+- Results are bookmarkable — searches update the URL (`?zip=10001`).
+- Dark mode is supported automatically via `prefers-color-scheme`.
 - Users can submit missing local officials via the built-in form (saved to Google Sheets).
-
-- Results are bookmarkable — searches update the URL (`?zip=10001`) for sharing, posting to social media, etc.
-
-- Features are added as available by a single developer (me), please be kind.
-
-  
+- Geolocation is **privacy-first**: coordinates are held only in browser memory and are never stored in localStorage, cookies, or sent to any server. A "Delete location data" button immediately nulls them.
 
 ---
 
@@ -40,15 +34,34 @@ Always available and sharable at: https://twinkites.github.io/localvotes
 
 | Source | Coverage | Notes |
 |--------|----------|-------|
-| [api.zippopotam.us](https://api.zippopotam.us) | ZIP → lat/lng/state | Free, no key |
-| [ProPublica Congress API](https://projects.propublica.org/api-docs/congress-api/) | Federal senators + House reps | Free, key recommended |
-| [US Census Geocoder](https://geocoding.geo.census.gov) | Congressional district from coordinates | Free, no key |
+| [api.zippopotam.us](https://api.zippopotam.us) | ZIP → lat/lng/city/state | Free, no key |
+| [ProPublica Congress API](https://projects.propublica.org/api-docs/congress-api/) | Federal senators + House reps, voting records, committees | Free, key recommended |
 | [OpenStates API](https://openstates.org/api/) | State legislators by location | Free (500 req/day), key required |
+| [Wikidata SPARQL](https://query.wikidata.org) | Statewide executives (Governor, AG, etc.) | Free, no key |
+| [US Census Geocoder](https://geocoding.geo.census.gov) | Congressional district from coordinates; reverse geocoding | Free, no key |
+| [Census TIGERweb](https://tigerweb.geo.census.gov) | District boundary GeoJSON; school district + county lookup | Free, no key |
+| [Nominatim (OpenStreetMap)](https://nominatim.openstreetmap.org) | Reverse geocoding fallback (used when Census geocoder returns no result) | Free, no key |
 | [FEC API](https://api.open.fec.gov) | Federal campaign finance | Free, key required |
 | [Congress.gov API](https://api.congress.gov) | Sponsored legislation | Free, key required |
-| DuckDuckGo search links | Local officials (city, school board, etc.) | No API — targeted search links |
+| School board JSON | Local school board members (MA and other states) | Generated by scraper — see below |
 
-LocalVotes is an independent project not affiliated with any government agency. Always verify information through official government websites. No warrenty express or implied. 
+---
+
+## School board data
+
+School board data is not available via a public API. Instead, a Python scraper builds a static JSON file per state:
+
+```bash
+pip install -r requirements-aggregator.txt
+python local-officials-aggregator.py --state MA
+python local-officials-aggregator.py --state NY --delay 3
+python local-officials-aggregator.py --state TX --max-districts 10   # test run
+```
+
+Output: `data/{state}_school_boards.json` (e.g. `data/ma_school_boards.json`).
+This file is committed to the repo and loaded by `js/school-boards.js` at runtime.
+
+The scraper uses Census TIGERweb to enumerate all school districts for the state, finds each district's website via DuckDuckGo search, locates the board/committee page, and parses member names and titles. Supports all 50 states. Massachusetts uses "School Committee" terminology and has additional URL slug patterns built in.
 
 ---
 
@@ -58,16 +71,24 @@ LocalVotes is an independent project not affiliated with any government agency. 
 localvotes/
 ├── .github/workflows/deploy.yml  # GitHub Actions deployment
 ├── index.html                    # Single-page app shell
-├── config.example.js             # API key template (for your reference)
+├── config.example.js             # API key template (copy to config.js, not committed)
+├── local-officials-aggregator.py # School board scraper (Python CLI)
+├── requirements-aggregator.txt   # Python dependencies for scraper
+├── data/
+│   └── *_school_boards.json      # Generated by scraper (committed, excluded from .gitignore)
 ├── css/
-│   └── style.css                 # All styles — mobile-first, CSS custom properties
+│   └── style.css                 # All styles — mobile-first, dark mode, CSS custom properties
 └── js/
-    ├── app.js           # Main controller — orchestrates search and enrichment
-    ├── geo.js           # ZIP to lat/lng/state via api.zippopotam.us
+    ├── app.js           # Main controller — orchestrates search, enrichment, and UI
+    ├── geo.js           # ZIP → lat/lng, reverse geocoding, congressional district + county
     ├── federal.js       # Federal officials via ProPublica
     ├── openstates.js    # State legislators via OpenStates
-    ├── congress.js      # Sponsored legislation via Congress.gov
+    ├── statewide.js     # Statewide executives (Governor, AG, etc.) via Wikidata SPARQL
+    ├── congress.js      # Voting records, sponsored legislation, committees via Congress.gov
     ├── fec.js           # Campaign finance via FEC
+    ├── school-boards.js # School board member lookup from static JSON
+    ├── civic-links.js   # Voter registration + polling place URLs per state
+    ├── map.js           # Leaflet map with district boundary overlays
     ├── local.js         # Local official search links and resources
     ├── submit.js        # User submission modal → Google Sheets
     └── ui.js            # DOM rendering, card templates, filter logic
@@ -77,6 +98,25 @@ Scripts are loaded in dependency order at the bottom of `index.html`. No bundler
 
 ---
 
+## Configuration
+
+Copy `config.example.js` to `config.js` (which is `.gitignore`d) and fill in your API keys:
+
+```js
+const CONFIG = {
+  PROPUBLICA_API_KEY: 'your-key',
+  OPENSTATES_API_KEY: 'your-key',
+  FEC_API_KEY:        'your-key',
+  CONGRESS_API_KEY:   'your-key',
+};
+```
+
+The app works without keys but will hit rate limits faster on ProPublica and OpenStates.
+
+---
+
 ## License
 
-MIT  © 2026 Twin Kites LLC
+MIT © 2026 Twin Kites LLC
+
+LocalVotes is an independent project not affiliated with any government agency. Always verify information through official government websites. No warranty express or implied.
