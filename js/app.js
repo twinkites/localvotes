@@ -191,7 +191,7 @@
     UI.renderDistrictPanel(geo);
     UI.renderCivicTools(geo);
     _updateMeta(geo.city, geo.stateAbbr, zip);
-    MapView.init(officials, geo, district);
+    MapView.init(officials.filter(o => !o.historical), geo, district);
     document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
   }
 

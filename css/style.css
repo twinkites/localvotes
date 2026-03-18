@@ -2185,3 +2185,53 @@ a.civic-tool-card:hover {
     border-top-width: 6px;
   }
 }
+
+/* ---------------------------------------------------------------
+   HISTORICAL REPRESENTATIVES DROPDOWN
+--------------------------------------------------------------- */
+.historical-details {
+  margin-top: var(--space-6);
+}
+
+.historical-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  list-style: none;
+  user-select: none;
+}
+
+.historical-summary::-webkit-details-marker { display: none; }
+
+.historical-summary::before {
+  content: '▶';
+  font-size: 0.65em;
+  transition: transform 0.2s ease;
+}
+
+.historical-details[open] .historical-summary::before {
+  transform: rotate(90deg);
+}
+
+.historical-count {
+  background: var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  padding: 1px 7px;
+  border-radius: 99px;
+}
+
+.historical-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+  opacity: 0.75;
+}

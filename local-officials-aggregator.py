@@ -29,6 +29,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import re
 import time
 from dataclasses import dataclass, asdict
@@ -131,11 +132,51 @@ SKIP_DOMAINS = frozenset({
     'wikipedia.org', 'facebook.com', 'twitter.com', 'instagram.com',
     'niche.com', 'greatschools.org', 'publicschoolreview.com',
     'schooldigger.com', 'usnews.com', 'yelp.com', 'linkedin.com',
-    'youtube.com', 'reddit.com', 'nextdoor.com',
+    'youtube.com', 'reddit.com', 'nextdoor.com', 'publicschoolsk12.com',
 })
 
 # Domains that are likely legitimate district/gov sites
 GOOD_TLDS = ('.org', '.net', '.edu', '.us', '.gov', '.k12')
+
+
+# ---------------------------------------------------------------------------
+# DDG search helper — shared by WebsiteFinder and SchoolFallback
+# ---------------------------------------------------------------------------
+
+DDG_URL         = 'https://html.duckduckgo.com/html/'
+DDG_BACKOFF_SEC = 120  # seconds to wait after a 202 rate-limit response
+DDG_MAX_RETRIES = 3
+
+
+def ddg_search(session: requests.Session, query: str, delay: float) -> Optional['BeautifulSoup']:
+    """
+    POST a query to DDG's HTML interface and return a BeautifulSoup of the results.
+    Handles 202 rate-limit responses with exponential back-off.
+    Returns None if all retries are exhausted or an error occurs.
+    """
+    for attempt in range(DDG_MAX_RETRIES):
+        if attempt > 0:
+            wait = DDG_BACKOFF_SEC * attempt
+            logger.warning(f'DDG rate-limited — backing off {wait}s (attempt {attempt + 1}/{DDG_MAX_RETRIES})')
+            time.sleep(wait)
+        else:
+            time.sleep(delay)
+        try:
+            r = session.post(
+                DDG_URL,
+                data={'q': query},
+                headers={'Content-Type': 'application/x-www-form-urlencoded'},
+                timeout=20,
+            )
+            if r.status_code == 202:
+                continue   # rate-limited — retry after back-off
+            r.raise_for_status()
+            return BeautifulSoup(r.text, 'lxml')
+        except Exception as e:
+            logger.warning(f'DDG request failed: {e}')
+            return None
+    logger.warning(f'DDG rate-limit unresolved after {DDG_MAX_RETRIES} attempts — skipping: {query}')
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -430,8 +471,6 @@ class WebsiteFinder:
     DuckDuckGo HTML search (no API key required).
     """
 
-    DDG_URL = 'https://html.duckduckgo.com/html/'
-
     def __init__(self, session: requests.Session, delay: float):
         self.session = session
         self.delay = delay
@@ -443,36 +482,107 @@ class WebsiteFinder:
 
         query = f'"{district.name}" {district.city} {district.state} school district official site'
         logger.info(f'Searching DDG for district site: {query}')
-        time.sleep(self.delay)
+        soup = ddg_search(self.session, query, self.delay)
+        if soup is None:
+            return None
 
+        for a in soup.select('a.result__a'):
+            href = a.get('href', '')
+            try:
+                parsed = urlparse(href)
+                host = parsed.netloc.lower()
+            except Exception:
+                continue
+            if any(bad in host for bad in SKIP_DOMAINS):
+                continue
+            if any(host.endswith(tld) for tld in GOOD_TLDS):
+                site = f'{parsed.scheme}://{parsed.netloc}'
+                logger.info(f'DDG → district site: {site}')
+                return site
+
+        return None
+
+
+# ---------------------------------------------------------------------------
+# publicschoolsk12.com school-level fallback
+# ---------------------------------------------------------------------------
+
+class SchoolFallback:
+    """
+    Fallback for when no district website can be found.
+
+    Uses the NCES Education Data Portal API (free, no key) to list the schools
+    in a district by LEAID, then DDG-searches each school by name + city + state
+    to find its official website.  Those school websites are then fed to the
+    board-page finder, since school sites commonly link to the district committee.
+    """
+
+    NCES_BASE   = 'https://educationdata.urban.org/api/v1/schools/ccd/directory'
+    NCES_YEAR   = 2021          # most recent complete CCD year
+    MAX_SCHOOLS = 4             # cap DDG searches per district
+
+    def __init__(self, session: requests.Session, delay: float):
+        self.session = session
+        self.delay   = delay
+
+    def find_school_websites(self, district: DistrictInfo) -> list[str]:
+        """Return official websites for up to MAX_SCHOOLS schools in this district."""
+        schools = self._nces_schools(district.leaid)
+        if not schools:
+            logger.info(f'NCES returned no schools for LEAID {district.leaid}')
+            return []
+        websites: list[str] = []
+        for school in schools[:self.MAX_SCHOOLS]:
+            site = self._search_school_website(school['name'], school['city'], district.state)
+            if site and site not in websites:
+                websites.append(site)
+        return websites
+
+    def _nces_schools(self, leaid: str) -> list[dict]:
+        """Return school names and cities for a district from the NCES CCD API."""
         try:
-            r = self.session.post(
-                self.DDG_URL,
-                data={'q': query},
-                headers={'Content-Type': 'application/x-www-form-urlencoded'},
-                timeout=20,
+            r = self.session.get(
+                f'{self.NCES_BASE}/{self.NCES_YEAR}/',
+                params={
+                    'leaid':  leaid,
+                    'fields': 'school_name,city_location',
+                    'limit':  20,
+                },
+                timeout=15,
             )
-            r.raise_for_status()
-            soup = BeautifulSoup(r.text, 'lxml')
-
-            for a in soup.select('a.result__a'):
-                href = a.get('href', '')
-                try:
-                    parsed = urlparse(href)
-                    host = parsed.netloc.lower()
-                except Exception:
-                    continue
-
-                if any(bad in host for bad in SKIP_DOMAINS):
-                    continue
-                if any(host.endswith(tld) for tld in GOOD_TLDS):
-                    site = f'{parsed.scheme}://{parsed.netloc}'
-                    logger.info(f'DDG → district site: {site}')
-                    return site
-
+            if not r.ok:
+                return []
+            results = r.json().get('results', [])
+            seen: set[str] = set()
+            schools: list[dict] = []
+            for s in results:
+                name = s.get('school_name', '').strip()
+                if name and name not in seen:
+                    seen.add(name)
+                    schools.append({'name': name, 'city': s.get('city_location', '')})
+            return schools
         except Exception as e:
-            logger.warning(f'DDG website search failed for {district.name}: {e}')
+            logger.warning(f'NCES lookup failed for LEAID {leaid}: {e}')
+            return []
 
+    def _search_school_website(self, name: str, city: str, state: str) -> Optional[str]:
+        """DDG-search for a school's official website by name + city + state."""
+        query = f'"{name}" {city} {state} official site'
+        logger.info(f'Searching DDG for school site: {name}')
+        soup = ddg_search(self.session, query, self.delay)
+        if soup is None:
+            return None
+        for a in soup.select('a.result__a'):
+            href = a.get('href', '')
+            try:
+                parsed = urlparse(href)
+                host   = parsed.netloc.lower()
+            except Exception:
+                continue
+            if any(bad in host for bad in SKIP_DOMAINS):
+                continue
+            if any(host.endswith(tld) for tld in GOOD_TLDS):
+                return f'{parsed.scheme}://{parsed.netloc}'
         return None
 
 
@@ -756,11 +866,12 @@ class BoardPageParser:
 # ---------------------------------------------------------------------------
 
 class OfficialsAggregator:
-    def __init__(self, rate_limit_delay: float = 2.0, use_browser: bool = False):
+    def __init__(self, rate_limit_delay: float = 6.0, use_browser: bool = False):
         self.delay = rate_limit_delay
         self.session = make_session()
         self.nces = DistrictLookup(self.session)
         self.website_finder = WebsiteFinder(self.session, rate_limit_delay)
+        self.schools_scraper = SchoolFallback(self.session, rate_limit_delay)
         self.board_finder = BoardPageFinder(self.session, rate_limit_delay)
         self.parser = BoardPageParser()
         self.browser: Optional[BrowserFetcher] = BrowserFetcher() if use_browser else None
@@ -791,7 +902,14 @@ class OfficialsAggregator:
 
             time.sleep(self.delay)
             website = self.website_finder.find(district)
-            if not website:
+
+            if website:
+                candidate_sites = [website]
+            else:
+                logger.info(f'No district website — trying publicschoolsk12.com fallback for {district.name}')
+                candidate_sites = self.schools_scraper.find_school_websites(district)
+
+            if not candidate_sites:
                 logger.warning(f'No website found for {district.name}')
                 result['not_found'].append({
                     'district': district.name,
@@ -800,10 +918,15 @@ class OfficialsAggregator:
                 result['districts'].append(district_entry)
                 continue
 
-            district_entry['website'] = website
-            time.sleep(self.delay)
-            board_url = self.board_finder.find(website)
+            board_url = None
+            for candidate in candidate_sites:
+                time.sleep(self.delay)
+                board_url = self.board_finder.find(candidate)
+                if board_url:
+                    website = candidate
+                    break
 
+            district_entry['website'] = website
             if not board_url:
                 logger.warning(f'No board page found at {website}')
                 result['not_found'].append({
@@ -1031,7 +1154,7 @@ class StateSchoolBoardAggregator:
       python local-officials-aggregator.py --state TX --max-districts 10   # test run
     """
 
-    def __init__(self, state_abbr: str, rate_limit_delay: float = 2.0,
+    def __init__(self, state_abbr: str, rate_limit_delay: float = 6.0,
                  use_browser: bool = False, max_districts: Optional[int] = None):
         state_abbr = state_abbr.upper()
         if state_abbr not in STATE_CONFIG:
@@ -1044,8 +1167,9 @@ class StateSchoolBoardAggregator:
         self.max_districts = max_districts
         self.session = make_session()
         self.district_fetcher = StateDistrictFetcher(state_abbr, self.session)
-        self.website_finder = WebsiteFinder(self.session, rate_limit_delay)
-        self.board_finder = StateBoardPageFinder(state_abbr, self.session, rate_limit_delay)
+        self.website_finder   = WebsiteFinder(self.session, rate_limit_delay)
+        self.schools_scraper  = SchoolFallback(self.session, rate_limit_delay)
+        self.board_finder     = StateBoardPageFinder(state_abbr, self.session, rate_limit_delay)
         self.parser = BoardPageParser()
         self.browser: Optional[BrowserFetcher] = BrowserFetcher() if use_browser else None
         self._title_re = _get_state_title_re(state_abbr)
@@ -1054,7 +1178,6 @@ class StateSchoolBoardAggregator:
         return f'data/{self.state_abbr.lower()}_school_boards.json'
 
     def run(self, output_path: Optional[str] = None):
-        import os
         if output_path is None:
             output_path = self.default_output_path()
         os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
@@ -1076,8 +1199,9 @@ class StateSchoolBoardAggregator:
 
             logger.info(f'[{i + 1}/{len(raw_districts)}] {name}')
 
+            city_hint = (_extract_state_cities(name) or [''])[0]
             district_info = DistrictInfo(
-                leaid=geoid, name=name, city='', state=self.state_abbr,
+                leaid=geoid, name=name, city=city_hint, state=self.state_abbr,
                 phone=None, website=None, zip_code='',
             )
 
@@ -1092,18 +1216,35 @@ class StateSchoolBoardAggregator:
                 'members': [],
             }
 
-            if not website:
-                logger.warning(f'No website for {name}')
-                districts_out.append(district_entry)
-                self._index(name, idx, city_index)
-                continue
+            # Build the list of candidate root URLs to probe for a board page.
+            # Primary: the district's own website.
+            # Fallback: individual school websites scraped from publicschoolsk12.com
+            #           (school sites often link to the district school committee).
+            if website:
+                candidate_sites = [website]
+            else:
+                logger.info(f'No district website — trying publicschoolsk12.com fallback for {name}')
+                candidate_sites = self.schools_scraper.find_school_websites(district_info)
+                if not candidate_sites:
+                    logger.warning(f'No website or school fallback found for {name}')
+                    districts_out.append(district_entry)
+                    self._index(name, idx, city_index)
+                    continue
 
-            time.sleep(self.delay)
-            board_page = self.board_finder.find(website)
+            board_page = None
+            for candidate in candidate_sites:
+                time.sleep(self.delay)
+                board_page = self.board_finder.find(candidate)
+                if board_page:
+                    district_entry['website'] = candidate
+                    break
+
             district_entry['board_page'] = board_page
 
             if not board_page:
-                logger.warning(f'No board page at {website}')
+                logger.warning(f'No board page found for {name}')
+                if not website and candidate_sites:
+                    district_entry['website'] = candidate_sites[0]
                 districts_out.append(district_entry)
                 self._index(name, idx, city_index)
                 continue
@@ -1207,8 +1348,8 @@ supported states: {supported_states}
     ap.add_argument('--output', default=None,
                     help='Output JSON file path (defaults: officials_output.json for --zip, '
                          'data/{state}_school_boards.json for --state)')
-    ap.add_argument('--delay', type=float, default=2.0,
-                    help='Seconds between requests — be polite (default: 2.0)')
+    ap.add_argument('--delay', type=float, default=6.0,
+                    help='Seconds between requests — be polite (default: 6.0)')
     ap.add_argument('--verbose', action='store_true',
                     help='Enable debug-level logging')
     ap.add_argument('--use-browser', action='store_true',

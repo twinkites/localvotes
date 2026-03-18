@@ -184,7 +184,7 @@ const UI = (() => {
       <div class="card-body">
         <div class="card-header">
           ${official.photoUrl
-            ? `<img src="${safeUrl(official.photoUrl)}" alt="${esc(official.name)}" class="official-photo" onerror="this.style.display='none'">`
+            ? `<img src="${safeUrl(official.photoUrl)}" alt="${esc(official.name)}" class="official-photo">`
             : `<div class="official-avatar" style="background:${partyColor}">${esc(initials)}</div>`
           }
           <div class="card-title">
@@ -300,7 +300,10 @@ const UI = (() => {
     const grid = document.getElementById('officials-grid');
     const levelCounts = {};
 
-    officials.forEach(o => { levelCounts[o.level] = (levelCounts[o.level] || 0) + 1; });
+    const current    = officials.filter(o => !o.historical);
+    const historical = officials.filter(o =>  o.historical);
+
+    current.forEach(o => { levelCounts[o.level] = (levelCounts[o.level] || 0) + 1; });
 
     // textContent is XSS-safe for zip display
     zipDisplay.textContent = zip;
@@ -310,7 +313,7 @@ const UI = (() => {
     const levels = ['All', ...Object.keys(levelCounts)];
     tabs.innerHTML = levels.map((l, i) =>
       `<button class="tab-pill ${i === 0 ? 'active' : ''}" data-level="${esc(l)}">
-        ${esc(l)} ${l === 'All' ? `(${officials.length})` : `(${levelCounts[l]})`}
+        ${esc(l)} ${l === 'All' ? `(${current.length})` : `(${levelCounts[l]})`}
       </button>`
     ).join('');
 
@@ -319,12 +322,44 @@ const UI = (() => {
       btn.addEventListener('click', () => filterByLevel(btn.dataset.level, btn));
     });
 
-    // Render all cards
-    grid.innerHTML = officials.map(renderOfficialCard).join('');
+    // Render current officials
+    grid.innerHTML = current.map(renderOfficialCard).join('');
+
+    // Render historical officials in a collapsible section
+    let historicalSection = document.getElementById('historical-section');
+    if (!historicalSection) {
+      historicalSection = document.createElement('div');
+      historicalSection.id = 'historical-section';
+      grid.parentNode.insertBefore(historicalSection, grid.nextSibling);
+    }
+    if (historical.length) {
+      historicalSection.innerHTML = `
+        <details class="historical-details">
+          <summary class="historical-summary">
+            Former Representatives <span class="historical-count">${historical.length}</span>
+          </summary>
+          <div class="historical-grid">
+            ${historical.map(renderOfficialCard).join('')}
+          </div>
+        </details>`;
+      historicalSection.querySelectorAll('.expand-btn').forEach(btn => {
+        btn.addEventListener('click', () => toggleDetails(btn.dataset.cardId));
+      });
+      historicalSection.querySelectorAll('.official-photo').forEach(img => {
+        img.addEventListener('error', () => { img.style.display = 'none'; });
+      });
+    } else {
+      historicalSection.innerHTML = '';
+    }
 
     // Attach expand button handlers via addEventListener
     grid.querySelectorAll('.expand-btn').forEach(btn => {
       btn.addEventListener('click', () => toggleDetails(btn.dataset.cardId));
+    });
+
+    // Hide broken photo images without an inline onerror (blocked by CSP)
+    grid.querySelectorAll('.official-photo').forEach(img => {
+      img.addEventListener('error', () => { img.style.display = 'none'; });
     });
 
     resultsSection.classList.remove('hidden');
@@ -338,7 +373,7 @@ const UI = (() => {
   function filterByLevel(level, btn) {
     document.querySelectorAll('.tab-pill').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
-    document.querySelectorAll('.official-card').forEach(card => {
+    document.querySelectorAll('#officials-grid .official-card').forEach(card => {
       card.style.display = (level === 'All' || card.dataset.level === level) ? '' : 'none';
     });
   }
@@ -360,6 +395,8 @@ const UI = (() => {
   function reset() {
     document.getElementById('results').classList.add('hidden');
     document.getElementById('officials-grid').innerHTML = '';
+    const hist = document.getElementById('historical-section');
+    if (hist) hist.innerHTML = '';
     const local = document.getElementById('local-officials-section');
     if (local) { local.classList.add('hidden'); local.innerHTML = ''; }
     const panel = document.getElementById('district-panel');

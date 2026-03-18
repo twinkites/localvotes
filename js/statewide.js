@@ -57,18 +57,8 @@ SELECT DISTINCT ?officialLabel ?posLabel ?partyLabel ?image WHERE {
   )
   FILTER(!CONTAINS(LCASE(STR(?posLabel)), "deputy"))
   FILTER(!CONTAINS(LCASE(STR(?posLabel)), "former"))
-  ?official p:P39 ?tenure .
-  ?tenure ps:P39 ?position .
-  # Exclude tenures that have an explicit end date
-  FILTER NOT EXISTS { ?tenure pq:P582 ?endDate }
-  # Exclude people who have a recorded date of death (catches historical officials
-  # like Luther Bradish whose tenure has no start/end dates in Wikidata)
-  FILTER NOT EXISTS { ?official wdt:P570 ?deathDate }
-  # If a start date is recorded, require it to be after 2000.
-  # Belt-and-suspenders: catches any living historical figure whose tenure
-  # somehow lacks an end date.
-  OPTIONAL { ?tenure pq:P580 ?startDate }
-  FILTER(!BOUND(?startDate) || ?startDate > "2000-01-01T00:00:00Z"^^xsd:dateTime)
+  # P1308 = "officeholder" — directly points to whoever currently holds the position
+  ?position wdt:P1308 ?official .
   OPTIONAL { ?official wdt:P102 ?party }
   OPTIONAL { ?official wdt:P18 ?image }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "en" }

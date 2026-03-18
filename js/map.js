@@ -42,6 +42,7 @@ const MapView = (() => {
     _setToggle('map');
     document.getElementById('map-container').classList.remove('hidden');
     document.getElementById('officials-grid').classList.add('hidden');
+    document.getElementById('historical-section')?.classList.add('hidden');
     document.querySelector('.filter-bar').classList.add('hidden');
 
     if (!_geo) return;
@@ -86,6 +87,7 @@ const MapView = (() => {
     _setToggle('cards');
     document.getElementById('map-container').classList.add('hidden');
     document.getElementById('officials-grid').classList.remove('hidden');
+    document.getElementById('historical-section')?.classList.remove('hidden');
     document.querySelector('.filter-bar').classList.remove('hidden');
   }
 

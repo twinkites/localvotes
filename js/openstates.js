@@ -41,6 +41,7 @@ const OpenStatesAPI = (() => {
     return {
       name: person.name,
       office: officeLabel,
+      historical: !person.current_role,
       level: 'State',
       levelRaw: 'administrativeArea1',
       stateAbbr,

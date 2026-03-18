@@ -25,8 +25,8 @@ Always available at: https://twinkites.github.io/localvotes
 - Share button (native share on mobile, clipboard fallback on desktop) and Print button.
 - Results are bookmarkable — searches update the URL (`?zip=10001`).
 - Dark mode is supported automatically via `prefers-color-scheme`.
-- Users can submit missing local officials via the built-in form (saved to Google Sheets).
-- Geolocation is **privacy-first**: coordinates are held only in browser memory and are never stored in localStorage, cookies, or sent to any server. A "Delete location data" button immediately nulls them.
+- Users can submit missing local officials via the built-in form (saved to a private Google Sheets, reviewed, and loaded back into the site).
+- Geolocation is **privacy-first**: coordinates are held only in browser memory and are never stored in storage, cookies, or sent to any server. A "Delete location data" button immediately deletes them.
 
 ---
 
