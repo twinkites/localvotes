@@ -1,0 +1,27 @@
+{
+  "generated": "2026-03-21",
+  "state": "MA",
+  "partial": true,
+  "districts": [
+    {
+      "name": "Methuen Public Schools",
+      "city": "Methuen",
+      "state": "MA",
+      "phone": null,
+      "website": "https://www.methuen.k12.ma.us",
+      "board_page": "https://www.methuen.k12.ma.us/school-community/directory",
+      "members": [
+        { "name": "David Beauregard Jr.",    "title": "School Committee Chairperson", "contact_email": "dbeauregard@ci.methuen.ma.us",      "contact_phone": "(978)983-8505" },
+        { "name": "Nicholas DiZoglio",        "title": "School Committee Vice Chair",  "contact_email": "nsdizoglio@methuen.k12.ma.us",       "contact_phone": "(978)476-5408" },
+        { "name": "Mary Beth Donovan-Grassi", "title": "School Committee Secretary",   "contact_email": "mydonovan@methuen.k12.ma.us",         "contact_phone": "(978)771-5751" },
+        { "name": "Martha McCarthy Sirois",   "title": "School Committee Member",      "contact_email": "mamccarthysirois@methuen.k12.ma.us",  "contact_phone": null            },
+        { "name": "Laurie Keegan",            "title": "School Committee Member",      "contact_email": "lakeekeegan@methuen.k12.ma.us",       "contact_phone": "(978)397-2912" },
+        { "name": "Kenneth Willette",         "title": "School Committee Member",      "contact_email": "khwillette@methuen.k12.ma.us",        "contact_phone": "(508)954-7384" },
+        { "name": "Alejandro Baez",           "title": "School Committee Member",      "contact_email": "aobaez@methuen.k12.ma.us",            "contact_phone": "(978)885-2897" }
+      ]
+    }
+  ],
+  "city_index": {
+    "methuen": [0]
+  }
+}

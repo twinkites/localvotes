@@ -24,6 +24,12 @@ Usage:
   # For JS-rendered board pages (e.g. schools using React/Angular CMS):
   pip install playwright && playwright install chromium
   python local-officials-aggregator.py --state CA --use-browser
+
+  # Scrape city/town council members:
+  python local-officials-aggregator.py --council --state MA
+  python local-officials-aggregator.py --council --state MA --max-cities 5  # test run
+  python local-officials-aggregator.py --new-england                        # all 6 NE states
+  python local-officials-aggregator.py --new-england --delay 8              # slower/polite
 """
 
 import argparse
@@ -1313,6 +1319,438 @@ class StateSchoolBoardAggregator:
 
 
 # ---------------------------------------------------------------------------
+# City / Town Council scraper — New England focus
+# ---------------------------------------------------------------------------
+
+# New England states (the first target region for city council data)
+NEW_ENGLAND_STATES = ('CT', 'MA', 'ME', 'NH', 'RI', 'VT')
+
+# Common URL slugs for city/town council pages
+COUNCIL_PAGE_SLUGS = [
+    '/city-council',
+    '/town-council',
+    '/council',
+    '/government/city-council',
+    '/government/town-council',
+    '/government/council',
+    '/elected-officials/city-council',
+    '/elected-officials/town-council',
+    '/departments/city-council',
+    '/departments/town-council',
+    '/selectboard',
+    '/board-of-selectmen',
+    '/selectmen',
+    '/government/selectboard',
+    '/government/board-of-selectmen',
+    '/government/selectmen',
+    '/aldermen',
+    '/board-of-aldermen',
+    '/government/aldermen',
+]
+
+# Navigation keywords for finding council links in homepages
+COUNCIL_NAV_KEYWORDS = (
+    'city council', 'town council', 'board of selectmen', 'selectboard',
+    'selectmen', 'board of aldermen', 'aldermen', 'council members',
+    'elected officials', 'government officials',
+)
+
+# Title keywords for identifying council members in parsed pages
+COUNCIL_TITLES = frozenset({
+    'mayor', 'council president', 'council vice president',
+    'city council', 'councilor', 'councilmember', 'council member',
+    'councilman', 'councilwoman', 'alderman', 'alderwoman', 'alderperson',
+    'at-large', 'at large', 'district representative',
+    'ward representative', 'ward councilor',
+    'selectman', 'selectwoman', 'selectperson', 'select board member',
+    'chair', 'vice chair', 'chairperson', 'chairman', 'chairwoman',
+    'member', 'town manager', 'city manager',
+})
+
+COUNCIL_TITLE_RE = re.compile(
+    r'\b(' + '|'.join(re.escape(t) for t in COUNCIL_TITLES) + r')\b',
+    re.IGNORECASE,
+)
+
+
+class CensusCitiesFetcher:
+    """
+    Fetches all incorporated places (cities, towns, villages) for a state
+    using the Census Bureau's free Decennial data API (no API key required).
+
+    Returns a list of dicts: [{'name': 'Methuen', 'fips_place': '45345'}, ...]
+    """
+
+    # 2020 Decennial Census — place list, no key needed
+    CENSUS_API = 'https://api.census.gov/data/2020/dec/pl'
+
+    def __init__(self, session: requests.Session):
+        self.session = session
+
+    def fetch(self, state_abbr: str) -> list[dict]:
+        cfg = STATE_CONFIG.get(state_abbr.upper())
+        if not cfg:
+            raise ValueError(f'Unknown state: {state_abbr}')
+        fips = cfg['fips']
+
+        try:
+            r = self.session.get(
+                self.CENSUS_API,
+                params={'get': 'NAME', 'for': 'place:*', 'in': f'state:{fips}'},
+                timeout=20,
+            )
+            r.raise_for_status()
+            rows = r.json()
+        except Exception as e:
+            logger.error(f'Census places fetch failed for {state_abbr}: {e}')
+            return []
+
+        places = []
+        for row in rows[1:]:   # first row is the header
+            raw_name = row[0]  # e.g. "Methuen city, Massachusetts"
+            fips_place = row[2]
+            # Strip the type suffix and state: "Methuen city, Massachusetts" → "Methuen"
+            city = re.split(r'\s+(?:city|town|village|borough|township|CDP),', raw_name, flags=re.I)[0].strip()
+            if city:
+                places.append({'name': city, 'fips_place': fips_place})
+
+        logger.info(f'{state_abbr}: {len(places)} places fetched from Census')
+        return places
+
+
+class CouncilPageFinder:
+    """
+    Given a city/town name and state, finds the URL of their council members page.
+
+    Strategy:
+      1. DDG-search for the official city/town website
+      2. Probe common council URL slug patterns
+      3. Fall back to scanning the homepage nav for council links
+    """
+
+    def __init__(self, session: requests.Session, delay: float):
+        self.session = session
+        self.delay = delay
+
+    def find_site(self, city: str, state_abbr: str) -> Optional[str]:
+        """DDG-search for the official city/town website."""
+        query = f'"{city}" {state_abbr} official city town government site'
+        logger.info(f'Searching DDG for city site: {city}, {state_abbr}')
+        soup = ddg_search(self.session, query, self.delay)
+        if soup is None:
+            return None
+
+        for a in soup.select('a.result__a'):
+            href = a.get('href', '')
+            try:
+                parsed = urlparse(href)
+                host = parsed.netloc.lower()
+            except Exception:
+                continue
+            if any(bad in host for bad in SKIP_DOMAINS):
+                continue
+            # Prefer .gov / .us / .org / .net — typical municipal TLDs
+            if any(host.endswith(tld) for tld in GOOD_TLDS):
+                site = f'{parsed.scheme}://{parsed.netloc}'
+                logger.info(f'DDG → city site: {site}')
+                return site
+
+        return None
+
+    def find_council_page(self, base_url: str) -> Optional[str]:
+        """Probe slug patterns then fall back to nav scan."""
+        for slug in COUNCIL_PAGE_SLUGS:
+            url = base_url.rstrip('/') + slug
+            time.sleep(self.delay * 0.25)
+            try:
+                r = self.session.get(url, timeout=10, allow_redirects=True)
+                if r.status_code == 200 and len(r.text) > 500:
+                    snippet = r.text[:5000].lower()
+                    if any(kw in snippet for kw in ('council', 'selectmen', 'aldermen', 'member')):
+                        logger.info(f'Council page found via slug: {r.url}')
+                        return r.url
+            except Exception:
+                continue
+
+        return self._find_in_nav(base_url)
+
+    def _find_in_nav(self, base_url: str) -> Optional[str]:
+        logger.info(f'Scanning homepage nav for council link: {base_url}')
+        try:
+            time.sleep(self.delay * 0.5)
+            r = self.session.get(base_url, timeout=12)
+            if r.status_code != 200:
+                return None
+            soup = BeautifulSoup(r.text, 'lxml')
+            for a in soup.find_all('a', href=True):
+                text = a.get_text(strip=True).lower()
+                if any(kw in text for kw in COUNCIL_NAV_KEYWORDS):
+                    href = a['href']
+                    full = href if href.startswith('http') else urljoin(base_url, href)
+                    logger.info(f'Council page found via nav: {full}')
+                    return full
+        except Exception as e:
+            logger.warning(f'Nav scan failed on {base_url}: {e}')
+        return None
+
+
+class CouncilPageParser:
+    """
+    Extracts council member names, titles, emails, and phones from a council page.
+
+    Uses the same three-strategy approach as BoardPageParser:
+      1. HTML tables
+      2. Staff/member card elements
+      3. Plain-text extraction near council-related headings
+    """
+
+    def parse(self, html: str, source_url: str, city: str) -> list[dict]:
+        soup = BeautifulSoup(html, 'lxml')
+        self._strip_noise(soup)
+
+        members = (
+            self._parse_tables(soup, source_url)
+            or self._parse_cards(soup, source_url)
+            or self._parse_text_blocks(soup, source_url)
+        )
+
+        # Deduplicate by lowercased name
+        seen: set[str] = set()
+        unique = []
+        for m in members:
+            key = m['name'].lower().strip()
+            if key and key not in seen:
+                seen.add(key)
+                unique.append(m)
+
+        logger.info(f'Parsed {len(unique)} council member(s) from {source_url}')
+        return unique
+
+    def _strip_noise(self, soup: BeautifulSoup):
+        for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'aside', 'noscript']):
+            tag.decompose()
+
+    def _make_member(self, name: str, title: str = 'Council Member',
+                     email: Optional[str] = None, phone: Optional[str] = None) -> dict:
+        return {'name': name, 'title': title, 'contact_email': email, 'contact_phone': phone}
+
+    def _clean_name(self, raw: str) -> str:
+        raw = re.sub(r'[\r\n\t]+', ' ', raw).strip()
+        raw = re.sub(r'\s{2,}', ' ', raw)
+        m = NAME_RE.search(raw)
+        return m.group(0) if m else ''
+
+    def _extract_email(self, cell) -> Optional[str]:
+        a = cell.find('a', href=re.compile(r'^mailto:', re.I))
+        if a:
+            return a['href'].replace('mailto:', '').strip()
+        m = re.search(r'[\w.+-]+@[\w.-]+\.\w{2,}', cell.get_text())
+        return m.group(0) if m else None
+
+    def _extract_phone(self, cell) -> Optional[str]:
+        m = PHONE_RE.search(cell.get_text())
+        return m.group(0) if m else None
+
+    def _parse_tables(self, soup: BeautifulSoup, url: str) -> list[dict]:
+        members = []
+        for table in soup.find_all('table'):
+            headers = [th.get_text(' ', strip=True).lower() for th in table.find_all('th')]
+            if not headers:
+                first_row = table.find('tr')
+                if first_row:
+                    headers = [td.get_text(' ', strip=True).lower()
+                                for td in first_row.find_all(['td', 'th'])]
+
+            header_str = ' '.join(headers)
+            if not any(kw in header_str for kw in ('name', 'member', 'council', 'alderman', 'selectman')):
+                continue
+
+            name_col  = next((i for i, h in enumerate(headers) if 'name' in h), 0)
+            title_col = next((i for i, h in enumerate(headers)
+                              if any(k in h for k in ('title', 'position', 'role', 'office', 'ward', 'district'))), None)
+            email_col = next((i for i, h in enumerate(headers) if 'email' in h or 'contact' in h), None)
+            phone_col = next((i for i, h in enumerate(headers) if 'phone' in h or 'tel' in h), None)
+
+            for row in table.find_all('tr')[1:]:
+                cells = row.find_all(['td', 'th'])
+                if len(cells) <= name_col:
+                    continue
+                name = self._clean_name(cells[name_col].get_text(' ', strip=True))
+                if not name:
+                    continue
+                title = cells[title_col].get_text(' ', strip=True) if title_col and len(cells) > title_col else 'Council Member'
+                email = self._extract_email(cells[email_col]) if email_col and len(cells) > email_col else None
+                phone = self._extract_phone(cells[phone_col]) if phone_col and len(cells) > phone_col else None
+                members.append(self._make_member(name, title or 'Council Member', email, phone))
+
+        return members
+
+    def _parse_cards(self, soup: BeautifulSoup, url: str) -> list[dict]:
+        members = []
+        for el in soup.find_all(['div', 'article', 'li', 'section']):
+            text = el.get_text(' ', strip=True)
+            if not COUNCIL_TITLE_RE.search(text):
+                continue
+            if len(text) > 600 or len(text) < 10:
+                continue
+
+            name_m = NAME_RE.search(text)
+            if not name_m:
+                continue
+            name = name_m.group(0)
+
+            title_m = COUNCIL_TITLE_RE.search(text)
+            title = title_m.group(0).title() if title_m else 'Council Member'
+
+            email = self._extract_email(el)
+            phone_m = PHONE_RE.search(text)
+            phone = phone_m.group(0) if phone_m else None
+
+            members.append(self._make_member(name, title, email, phone))
+
+        return members
+
+    def _parse_text_blocks(self, soup: BeautifulSoup, url: str) -> list[dict]:
+        members = []
+        council_headings = [
+            h for h in soup.find_all(['h1', 'h2', 'h3', 'h4'])
+            if any(kw in h.get_text(strip=True).lower()
+                   for kw in ('council', 'selectmen', 'selectboard', 'aldermen', 'members'))
+        ]
+        for heading in council_headings:
+            block = []
+            for sib in heading.find_next_siblings():
+                if sib.name in ('h1', 'h2', 'h3', 'h4'):
+                    break
+                block.append(sib.get_text(' ', strip=True))
+
+            text = ' '.join(block)
+            for m in NAME_RE.finditer(text):
+                name = m.group(0)
+                members.append(self._make_member(name))
+
+        return members
+
+
+class CityCouncilAggregator:
+    """
+    Scrapes city/town council member data for all incorporated places in a state.
+
+    Targets New England states where municipal government data is sparse online.
+    Outputs to data/{state_lower}_city_council.json with the same shape expected
+    by js/city-council.js.
+
+    Usage:
+      python local-officials-aggregator.py --council --state MA
+      python local-officials-aggregator.py --council --new-england
+      python local-officials-aggregator.py --council --state CT --max-cities 10
+    """
+
+    def __init__(self, state_abbr: str, rate_limit_delay: float = 6.0,
+                 max_cities: Optional[int] = None):
+        state_abbr = state_abbr.upper()
+        if state_abbr not in STATE_CONFIG:
+            raise ValueError(f'Unsupported state: {state_abbr}')
+        self.state_abbr = state_abbr
+        self.delay = rate_limit_delay
+        self.max_cities = max_cities
+        self.session = make_session()
+        self.cities_fetcher = CensusCitiesFetcher(self.session)
+        self.page_finder = CouncilPageFinder(self.session, rate_limit_delay)
+        self.parser = CouncilPageParser()
+
+    def default_output_path(self) -> str:
+        return f'data/{self.state_abbr.lower()}_city_council.json'
+
+    def run(self, output_path: Optional[str] = None):
+        if output_path is None:
+            output_path = self.default_output_path()
+        os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
+
+        logger.info(f'Fetching {self.state_abbr} cities/towns from Census...')
+        places = self.cities_fetcher.fetch(self.state_abbr)
+
+        if self.max_cities:
+            places = places[:self.max_cities]
+            logger.info(f'Capped at {self.max_cities} cities (--max-cities)')
+
+        councils_out: list[dict] = []
+        city_index: dict[str, list[int]] = {}
+
+        for i, place in enumerate(places):
+            city = place['name']
+            idx  = len(councils_out)
+            logger.info(f'[{i + 1}/{len(places)}] {city}, {self.state_abbr}')
+
+            time.sleep(self.delay)
+            site = self.page_finder.find_site(city, self.state_abbr)
+
+            council_entry: dict = {
+                'name':         f'{city} City Council',
+                'city':         city,
+                'state':        self.state_abbr,
+                'website':      site,
+                'council_page': None,
+                'members':      [],
+            }
+
+            if not site:
+                logger.warning(f'No website found for {city}, {self.state_abbr}')
+                councils_out.append(council_entry)
+                city_index.setdefault(city.lower(), []).append(idx)
+                continue
+
+            time.sleep(self.delay)
+            council_page = self.page_finder.find_council_page(site)
+            council_entry['council_page'] = council_page
+
+            if not council_page:
+                logger.warning(f'No council page found for {city}')
+                councils_out.append(council_entry)
+                city_index.setdefault(city.lower(), []).append(idx)
+                continue
+
+            time.sleep(self.delay)
+            try:
+                r = self.session.get(council_page, timeout=15)
+                r.raise_for_status()
+                members = self.parser.parse(r.text, council_page, city)
+                council_entry['members'] = members
+                logger.info(f'✓ {city}: {len(members)} member(s)')
+            except Exception as e:
+                logger.error(f'Parse error for {council_page}: {e}')
+
+            councils_out.append(council_entry)
+            city_index.setdefault(city.lower(), []).append(idx)
+
+            # Checkpoint every 25 cities
+            if (i + 1) % 25 == 0:
+                self._save(councils_out, city_index, output_path, partial=True)
+
+        self._save(councils_out, city_index, output_path, partial=False)
+
+        total_members = sum(len(c['members']) for c in councils_out)
+        no_members = sum(1 for c in councils_out if not c['members'])
+        logger.info(
+            f'Done — {len(councils_out)} cities, {total_members} members found, '
+            f'{no_members} cities with no members parsed'
+        )
+
+    def _save(self, councils: list, city_index: dict, path: str, partial: bool = False):
+        payload = {
+            'generated': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+            'state':     self.state_abbr,
+            'partial':   partial,
+            'councils':  councils,
+            'city_index': city_index,
+        }
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+        status = '(partial checkpoint)' if partial else ''
+        logger.info(f'Saved → {path} {status}')
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -1345,6 +1783,16 @@ supported states: {supported_states}
                     help='Alias for --state MA (backward compatibility)')
     ap.add_argument('--max-districts', type=int, default=None, metavar='N',
                     help='Limit --state scrape to first N districts (useful for testing)')
+
+    # City council flags
+    ap.add_argument('--council', action='store_true',
+                    help='Scrape city/town council members instead of school boards. '
+                         'Use with --state XX or --new-england.')
+    ap.add_argument('--new-england', action='store_true',
+                    help='Scrape city/town council members for all New England states '
+                         '(CT, MA, ME, NH, RI, VT). Implies --council.')
+    ap.add_argument('--max-cities', type=int, default=None, metavar='N',
+                    help='Limit --council scrape to first N cities per state (useful for testing)')
     ap.add_argument('--output', default=None,
                     help='Output JSON file path (defaults: officials_output.json for --zip, '
                          'data/{state}_school_boards.json for --state)')
@@ -1366,8 +1814,8 @@ supported states: {supported_states}
     # --ma is a backward-compatible alias for --state MA
     state = args.state or ('MA' if args.ma else None)
 
-    if not state and not args.zip:
-        ap.error('One of --zip, --state XX, or --ma is required.')
+    if not state and not args.zip and not args.new_england:
+        ap.error('One of --zip, --state XX, --ma, or --new-england is required.')
 
     if args.use_browser and not PLAYWRIGHT_AVAILABLE:
         ap.error(
@@ -1375,6 +1823,29 @@ supported states: {supported_states}
             '  pip install playwright\n'
             '  playwright install chromium'
         )
+
+    # ── City/town council scrape — New England all-states shorthand ──────────
+    if args.council and not state and not args.zip and not args.new_england:
+        ap.error('--council requires --state XX or --new-england.')
+
+    if args.new_england:
+        target_states = NEW_ENGLAND_STATES
+    elif args.council and state:
+        target_states = (state.upper(),)
+    else:
+        target_states = ()
+
+    if target_states:
+        for abbr in target_states:
+            logger.info(f'=== City council scrape: {abbr} ===')
+            out_path = args.output or f'data/{abbr.lower()}_city_council.json'
+            agg = CityCouncilAggregator(
+                state_abbr=abbr,
+                rate_limit_delay=args.delay,
+                max_cities=args.max_cities,
+            )
+            agg.run(out_path)
+        return
 
     # ── Statewide school board scrape ────────────────────────────────────────
     if state:

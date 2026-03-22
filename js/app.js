@@ -161,14 +161,15 @@
     Object.assign(geo, geoCtx);
 
     // Step 3: Fetch federal, state, statewide executive, and school board officials in parallel
-    const [federalOfficials, stateOfficials, statewideOfficials, schoolBoardOfficials] = await Promise.all([
+    const [federalOfficials, stateOfficials, statewideOfficials, schoolBoardOfficials, cityCouncilOfficials] = await Promise.all([
       FederalAPI.getOfficials(geo.stateAbbr, district),
       OpenStatesAPI.getOfficials(geo.lat, geo.lng),
       StatewideAPI.getOfficials(geo.stateAbbr),
       SchoolBoards.lookup(geo.city, geo.stateAbbr),
+      CityCouncil.lookup(geo.city, geo.stateAbbr),
     ]);
 
-    const officials = [...federalOfficials, ...statewideOfficials, ...stateOfficials, ...schoolBoardOfficials];
+    const officials = [...federalOfficials, ...statewideOfficials, ...stateOfficials, ...schoolBoardOfficials, ...cityCouncilOfficials];
 
     // Step 4: Enrich with secondary data sources in parallel (all silent-fail)
     await Promise.all(officials.map(o => Promise.all([
