@@ -12,6 +12,37 @@
   // Nulled immediately when the user deletes location data or edits the ZIP manually.
   let _locationCoords = null;
 
+  // ── Secret dedication ────────────────────────────────────────────────────
+  (() => {
+    const SEQ = 'june';
+    let _buf = '';
+    document.addEventListener('keydown', e => {
+      _buf = (_buf + e.key.toLowerCase()).slice(-SEQ.length);
+      if (_buf !== SEQ) return;
+      _buf = '';
+
+      const toast = document.createElement('div');
+      toast.textContent = '❤️ This site is dedicated to those I love, and the memory of June the cat.🐈‍⬛';
+      Object.assign(toast.style, {
+        position: 'fixed', bottom: '2rem', left: '50%',
+        transform: 'translateX(-50%)',
+        background: '#1a202c', color: '#fff',
+        padding: '0.75rem 1.5rem', borderRadius: '9999px',
+        fontSize: '1rem', fontFamily: 'inherit',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+        zIndex: '9999', opacity: '0',
+        transition: 'opacity 0.4s ease',
+        whiteSpace: 'nowrap',
+      });
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => { toast.style.opacity = '1'; });
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.addEventListener('transitionend', () => toast.remove());
+      }, 3000);
+    });
+  })();
+
   SubmitForm.init();
 
   // View toggle — wire once; MapView keeps track of state
