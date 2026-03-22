@@ -82,7 +82,7 @@ const SubmitForm = (() => {
     });
 
     try {
-      // Google Forms requires no-cors — response is always opaque, we assume success
+      // Google Forms requires no-cors - response is always opaque, we assume success
       await fetch(FORM_URL, {
         method: 'POST',
         mode: 'no-cors',
@@ -93,7 +93,7 @@ const SubmitForm = (() => {
       btn.textContent = 'Submitted ✓';
       setTimeout(close, 2500);
     } catch {
-      setStatus('Submission failed — please try again or email us directly.', true);
+      setStatus('Submission failed - please try again or email us directly.', true);
       btn.disabled = false;
       btn.textContent = 'Submit';
     }

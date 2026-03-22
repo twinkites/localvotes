@@ -72,7 +72,7 @@ const MapView = (() => {
         _marker.on('mouseover', () => _marker.openPopup());
         _marker.openPopup();
 
-        // Add district boundary layers — await the pre-fetched promise
+        // Add district boundary layers - await the pre-fetched promise
         const boundaries = await _boundaryData;
         _addBoundaryLayers(boundaries);
       } else {
@@ -123,7 +123,7 @@ const MapView = (() => {
   }
 
   // Query TIGERweb for the user's congressional district polygon by GEOID.
-  // Tries likely layer IDs in order — silently skips layers that return no data.
+  // Tries likely layer IDs in order - silently skips layers that return no data.
   async function _fetchCongressionalDistrict(stateFips, district) {
     if (!district) return null;
     const geoid = stateFips + String(district).padStart(2, '0');

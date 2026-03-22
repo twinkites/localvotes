@@ -9,8 +9,8 @@
       "state": "MA",
       "website": "https://www.cityofmethuen.net/322/City-Council",
       "members": [
-        { "name": "Neily Soto",       "title": "City Council Chair — East District Councilor", "contact_email": "nsoto@ci.methuen.ma.us",   "contact_phone": "978-423-9447" },
-        { "name": "Jana Zanni Pesce", "title": "City Council Vice Chair — Councilor at Large",  "contact_email": "jpesce@ci.methuen.ma.us",  "contact_phone": "978-852-7255" },
+        { "name": "Neily Soto",       "title": "City Council Chair - East District Councilor", "contact_email": "nsoto@ci.methuen.ma.us",   "contact_phone": "978-423-9447" },
+        { "name": "Jana Zanni Pesce", "title": "City Council Vice Chair - Councilor at Large",  "contact_email": "jpesce@ci.methuen.ma.us",  "contact_phone": "978-852-7255" },
         { "name": "Ryan DiZoglio",    "title": "Councilor at Large",                            "contact_email": "RDiZoglio@ci.methuen.ma.us","contact_phone": "978-200-2637" },
         { "name": "John Drew",        "title": "Councilor at Large",                            "contact_email": "JDrew@ci.methuen.ma.us",   "contact_phone": "978-200-2384" },
         { "name": "Ronald Marsan",    "title": "East District Councilor",                       "contact_email": "RMarsan@ci.methuen.ma.us", "contact_phone": "978-815-6935" },

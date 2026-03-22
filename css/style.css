@@ -1,5 +1,5 @@
 /* =============================================================
-   LocalVotes — style.css
+   LocalVotes - style.css
    A clean, accessible civic-tech design system.
    Mobile-first, custom properties throughout.
 ============================================================= */
@@ -248,6 +248,65 @@ button {
   color: var(--color-text);
   text-decoration: none;
 }
+
+button.nav-link {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Contact rep panel */
+.contact-panel {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+.contact-panel-label {
+  font-weight: var(--font-medium);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+}
+.contact-message {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  resize: vertical;
+  min-height: 100px;
+}
+.contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.contact-action-btn {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition: background var(--transition-fast);
+}
+.contact-action-btn:hover { background: var(--color-bg-alt); }
+.contact-action-btn.primary {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+.contact-action-btn.primary:hover { background: var(--color-primary-dark); }
 
 /* ---------------------------------------------------------------
    5. HERO / SEARCH SECTION
@@ -1328,6 +1387,62 @@ button {
   border: 1px solid #feb2b2;
 }
 
+html[data-theme="dark"] .sf-status.sf-success {
+  background: #0d2418;
+  color: #4ade80;
+  border-color: #166534;
+}
+
+html[data-theme="dark"] .sf-status.sf-error {
+  background: #2d1515;
+  color: #fca5a5;
+  border-color: #991b1b;
+}
+
+/* Help modal */
+.help-modal-inner {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+  font-family: inherit;
+  position: relative;
+}
+
+.help-modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.help-modal-title {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+  color: var(--color-text);
+}
+
+.help-modal-list {
+  margin: 0;
+  padding: 0 0 0 1.25rem;
+  line-height: 1.8;
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+
+.help-modal-footer {
+  margin: 1rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
 .sf-actions {
   display: flex;
   justify-content: flex-end;
@@ -1887,75 +2002,73 @@ button {
 /* ---------------------------------------------------------------
    DARK MODE
 --------------------------------------------------------------- */
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --color-bg:              #0f172a;
-    --color-bg-alt:          #1e293b;
-    --color-surface:         #1e293b;
-    --color-border:          #334155;
-    --color-border-strong:   #475569;
-    --color-text:            #e2e8f0;
-    --color-text-muted:      #94a3b8;
-    --color-text-subtle:     #64748b;
-    --color-primary:         #60a5fa;
-    --color-primary-dark:    #3b82f6;
-    --color-primary-light:   #1e3a5f;
-    --color-error-bg:        #2d1515;
-    --color-error-border:    #f87171;
-    --color-error-text:      #f87171;
-  }
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg:              #0f172a;
+  --color-bg-alt:          #1e293b;
+  --color-surface:         #1e293b;
+  --color-border:          #334155;
+  --color-border-strong:   #475569;
+  --color-text:            #e2e8f0;
+  --color-text-muted:      #94a3b8;
+  --color-text-subtle:     #64748b;
+  --color-primary:         #60a5fa;
+  --color-primary-dark:    #3b82f6;
+  --color-primary-light:   #1e3a5f;
+  --color-error-bg:        #2d1515;
+  --color-error-border:    #f87171;
+  --color-error-text:      #f87171;
+}
 
-  body { background: var(--color-bg); }
+html[data-theme="dark"] body { background: var(--color-bg); }
 
-  .search-input {
-    background: #0f172a;
-    color: var(--color-text);
-    border-color: var(--color-border);
-  }
+html[data-theme="dark"] .search-input {
+  background: #0f172a;
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
 
-  .official-card {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-  }
+html[data-theme="dark"] .official-card {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
 
-  .card-details {
-    background: #0f172a;
-    border-top-color: var(--color-border);
-  }
+html[data-theme="dark"] .card-details {
+  background: #0f172a;
+  border-top-color: var(--color-border);
+}
 
-  .tab-pill {
-    background: var(--color-bg-alt);
-    color: var(--color-text-muted);
-    border-color: var(--color-border);
-  }
-  .tab-pill.active {
-    background: var(--color-primary-light);
-    color: var(--color-primary);
-    border-color: var(--color-primary);
-  }
+html[data-theme="dark"] .tab-pill {
+  background: var(--color-bg-alt);
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+html[data-theme="dark"] .tab-pill.active {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
 
-  .location-status {
-    background: #0d2418;
-    border-color: #166534;
-  }
-  .location-label { color: #4ade80; }
+html[data-theme="dark"] .location-status {
+  background: #0d2418;
+  border-color: #166534;
+}
+html[data-theme="dark"] .location-label { color: #4ade80; }
 
-  .local-group-card,
-  .resource-card,
-  .about-card {
-    background: var(--color-surface);
-    border-color: var(--color-border);
-  }
+html[data-theme="dark"] .local-group-card,
+html[data-theme="dark"] .resource-card,
+html[data-theme="dark"] .about-card {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
 
-  .reps-popup .leaflet-popup-content-wrapper {
-    background: var(--color-surface);
-    color: var(--color-text);
-    border: 1px solid var(--color-border);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
-  }
-  .reps-popup .leaflet-popup-tip {
-    background: var(--color-surface);
-  }
+html[data-theme="dark"] .reps-popup .leaflet-popup-content-wrapper {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+html[data-theme="dark"] .reps-popup .leaflet-popup-tip {
+  background: var(--color-surface);
 }
 
 /* ---------------------------------------------------------------
@@ -2038,10 +2151,8 @@ button {
   border: 1px solid #86efac;
 }
 
-@media (prefers-color-scheme: dark) {
-  .cd-chip     { background: #1e3a5f; color: #93c5fd; border-color: #1e40af; }
-  .county-chip { background: #0d2418; color: #4ade80; border-color: #166534; }
-}
+html[data-theme="dark"] .cd-chip     { background: #1e3a5f; color: #93c5fd; border-color: #1e40af; }
+html[data-theme="dark"] .county-chip { background: #0d2418; color: #4ade80; border-color: #166534; }
 
 /* ---------------------------------------------------------------
    CIVIC TOOLS (register, polling, election)
@@ -2168,10 +2279,8 @@ a.civic-tool-card:hover {
   color: #991b1b;
 }
 
-@media (prefers-color-scheme: dark) {
-  .committee-side.majority { background: #1e3a5f; color: #93c5fd; }
-  .committee-side.minority { background: #2d1515; color: #fca5a5; }
-}
+html[data-theme="dark"] .committee-side.majority { background: #1e3a5f; color: #93c5fd; }
+html[data-theme="dark"] .committee-side.minority { background: #2d1515; color: #fca5a5; }
 
 /* ---------------------------------------------------------------
    REDUCED MOTION

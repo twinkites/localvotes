@@ -1,4 +1,4 @@
-// statewide.js — fetches current statewide elected officials (Governor, AG, etc.)
+// statewide.js - fetches current statewide elected officials (Governor, AG, etc.)
 // via Wikidata SPARQL (free, no API key).
 // Results are cached per state for the browser session.
 
@@ -57,7 +57,7 @@ SELECT DISTINCT ?officialLabel ?posLabel ?partyLabel ?image WHERE {
   )
   FILTER(!CONTAINS(LCASE(STR(?posLabel)), "deputy"))
   FILTER(!CONTAINS(LCASE(STR(?posLabel)), "former"))
-  # P1308 = "officeholder" — directly points to whoever currently holds the position
+  # P1308 = "officeholder" - directly points to whoever currently holds the position
   ?position wdt:P1308 ?official .
   OPTIONAL { ?official wdt:P102 ?party }
   OPTIONAL { ?official wdt:P18 ?image }

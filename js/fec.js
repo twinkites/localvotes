@@ -3,7 +3,7 @@ const FECAPI = (() => {
 
   async function enrich(official) {
     if (!CONFIG.FEC_API_KEY) return official;
-    // FEC only tracks federal campaign finance — skip state/local officials
+    // FEC only tracks federal campaign finance - skip state/local officials
     if (official.level !== 'Federal') return official;
     try {
       const nameParts = official.name.split(' ');

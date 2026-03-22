@@ -175,7 +175,7 @@ const UI = (() => {
           .filter(Boolean).map(esc).join(', ')
       : '';
 
-    // Initials for avatar fallback — safe since we only take first chars
+    // Initials for avatar fallback - safe since we only take first chars
     const initials = official.name.split(' ').map(n => n[0]).filter(Boolean).slice(0, 2).join('');
 
     return `
@@ -204,6 +204,31 @@ const UI = (() => {
           ${addressStr ? `<div class="contact-item">📍 ${addressStr}</div>` : ''}
           ${renderChannels(official.channels)}
           <div class="contact-item news-link-item">📰 <a href="https://duckduckgo.com/?q=%22${encodeURIComponent(official.name)}%22&ia=news&iax=news" target="_blank" rel="noopener noreferrer">Recent news</a></div>
+        </div>
+
+        <button class="expand-btn contact-rep-btn" data-contact-id="contact-${cardId}"
+                aria-expanded="false" aria-controls="contact-${cardId}"
+                style="margin-top:var(--space-3)">
+          ✉️ Contact Rep
+        </button>
+        <div id="contact-${cardId}" class="contact-panel hidden">
+          <div class="contact-panel-label">Message template</div>
+          <textarea class="contact-message">Dear ${esc(official.name)},
+
+My name is [Your Name] and I am a constituent in your district. I am writing to share my views on [issue].
+
+[Your message here]
+
+Thank you for your service and your attention to this matter.
+
+Sincerely,
+[Your Name]
+[Your Address]</textarea>
+          <div class="contact-actions">
+            <button class="contact-action-btn primary copy-msg-btn">📋 Copy message</button>
+            ${official.emails.length ? `<a href="mailto:${esc(official.emails[0])}?subject=Message%20from%20a%20constituent" class="contact-action-btn">✉️ Open email</a>` : ''}
+            ${official.phones.length ? `<a href="tel:${esc(official.phones[0])}" class="contact-action-btn">📞 Call</a>` : ''}
+          </div>
         </div>
 
         ${hasDetails ? `
@@ -244,7 +269,7 @@ const UI = (() => {
       <div class="local-section-header">
         <h2 class="section-title">Local Officials</h2>
         <p class="section-subtitle">
-          No free API covers city councils, school boards, and special districts —
+          No free API covers city councils, school boards, and special districts -
           but these targeted searches and resources will take you straight to the right place for
           <strong>${esc(city)}, ${esc(state)}</strong>.
         </p>
@@ -310,7 +335,7 @@ const UI = (() => {
     // textContent is XSS-safe for zip display
     zipDisplay.textContent = zip;
 
-    // Build filter tabs using data attributes — no inline JS handlers
+    // Build filter tabs using data attributes - no inline JS handlers
     const tabs = document.getElementById('level-tabs');
     const levels = ['All', ...Object.keys(levelCounts)];
     tabs.innerHTML = levels.map((l, i) =>
@@ -344,8 +369,18 @@ const UI = (() => {
             ${historical.map(renderOfficialCard).join('')}
           </div>
         </details>`;
-      historicalSection.querySelectorAll('.expand-btn').forEach(btn => {
+      historicalSection.querySelectorAll('.expand-btn:not(.contact-rep-btn)').forEach(btn => {
         btn.addEventListener('click', () => toggleDetails(btn.dataset.cardId));
+      });
+      historicalSection.querySelectorAll('.contact-rep-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const panel = document.getElementById(btn.dataset.contactId);
+          if (!panel) return;
+          panel.classList.toggle('hidden');
+          const open = !panel.classList.contains('hidden');
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          btn.textContent = open ? '✉️ Hide contact' : '✉️ Contact Rep';
+        });
       });
       historicalSection.querySelectorAll('.official-photo').forEach(img => {
         img.addEventListener('error', () => { img.style.display = 'none'; });
@@ -355,8 +390,35 @@ const UI = (() => {
     }
 
     // Attach expand button handlers via addEventListener
-    grid.querySelectorAll('.expand-btn').forEach(btn => {
+    grid.querySelectorAll('.expand-btn:not(.contact-rep-btn)').forEach(btn => {
       btn.addEventListener('click', () => toggleDetails(btn.dataset.cardId));
+    });
+
+    // Attach contact rep panel toggles
+    grid.querySelectorAll('.contact-rep-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const panel = document.getElementById(btn.dataset.contactId);
+        if (!panel) return;
+        panel.classList.toggle('hidden');
+        const open = !panel.classList.contains('hidden');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.textContent = open ? '✉️ Hide contact' : '✉️ Contact Rep';
+      });
+    });
+
+    // Copy message button
+    grid.querySelectorAll('.copy-msg-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const textarea = btn.closest('.contact-panel').querySelector('.contact-message');
+        navigator.clipboard.writeText(textarea.value).then(() => {
+          const orig = btn.textContent;
+          btn.textContent = '✅ Copied!';
+          setTimeout(() => { btn.textContent = orig; }, 2000);
+        }).catch(() => {
+          textarea.select();
+          document.execCommand('copy');
+        });
+      });
     });
 
     // Hide broken photo images without an inline onerror (blocked by CSP)
@@ -390,7 +452,7 @@ const UI = (() => {
 
   function showError(msg) {
     const el = document.getElementById('error-msg');
-    el.textContent = msg; // textContent, not innerHTML — safe
+    el.textContent = msg; // textContent, not innerHTML - safe
     el.classList.remove('hidden');
   }
 

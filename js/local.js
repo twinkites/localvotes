@@ -62,10 +62,10 @@ const LocalOfficials = (() => {
     },
   ];
 
-  // National resources — each verified working as of March 2026
+  // National resources - each verified working as of March 2026
   const NATIONAL_RESOURCES = [
     {
-      name: 'USA.gov — Local Governments',
+      name: 'USA.gov - Local Governments',
       url: 'https://www.usa.gov/local-governments',
       description: 'Official U.S. government hub linking to local government directories in every state',
     },
@@ -75,7 +75,7 @@ const LocalOfficials = (() => {
       description: 'Non-partisan voter guide with ballot lookups and election information',
     },
     {
-      name: 'Ballotpedia — Who Represents Me?',
+      name: 'Ballotpedia - Who Represents Me?',
       url: 'https://ballotpedia.org/Who_represents_me',
       description: 'Comprehensive encyclopedia of U.S. politics with elected official lookup by address',
     },
@@ -86,15 +86,15 @@ const LocalOfficials = (() => {
     },
   ];
 
-  // State-specific portals — only URLs verified working as of March 2026
+  // State-specific portals - only URLs verified working as of March 2026
   // Other states fall back to a targeted DDG search
   const STATE_PORTALS = {
     'CA': {
-      name: 'California Secretary of State — Elections',
+      name: 'California Secretary of State - Elections',
       url: 'https://www.sos.ca.gov/elections',
     },
     'IL': {
-      name: 'Illinois State Board of Elections — District Locator',
+      name: 'Illinois State Board of Elections - District Locator',
       url: 'https://www.elections.il.gov/',
     },
     'PA': {

@@ -8,48 +8,103 @@
   const shareBtn = document.getElementById('share-btn');
   const printBtn = document.getElementById('print-btn');
 
-  // In-memory location state — never written to localStorage, cookies, or any server.
+  // In-memory location state - never written to localStorage, cookies, or any server.
   // Nulled immediately when the user deletes location data or edits the ZIP manually.
   let _locationCoords = null;
 
-  // ── Secret dedication ────────────────────────────────────────────────────
+  // This site is dedicated to the memory of June the cat. 🐈‍⬛
+
+  // ── Help popup ───────────────────────────────────────────────────────────
+  function _openHelp() {
+    if (document.getElementById('help-modal')) return;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'help-modal';
+    Object.assign(overlay.style, {
+      position: 'fixed', inset: '0',
+      background: 'rgba(0,0,0,0.5)',
+      zIndex: '9999',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '1rem',
+      opacity: '0', transition: 'opacity 0.25s ease',
+    });
+
+    overlay.innerHTML = `
+      <div class="help-modal-inner">
+        <button id="help-close" aria-label="Close help" class="help-modal-close">✕</button>
+        <h2 class="help-modal-title">How to use LocalVotes</h2>
+        <ul class="help-modal-list">
+          <li><strong>Enter your ZIP code</strong> to find every elected official who represents you - from Congress down to your school committee.</li>
+          <li><strong>Use my location</strong> to automatically detect your ZIP.</li>
+          <li><strong>Filter by level</strong> using the tabs (Federal, State, County, etc.) to narrow results.</li>
+          <li><strong>View Policy &amp; Finance Data</strong> on any card to see voting record, campaign finance, and sponsored legislation.</li>
+          <li>Switch between <strong>Cards</strong> and <strong>Map</strong> view using the toggle above the results.</li>
+          <li>Use the <strong>Share</strong> button to copy a link directly to your results.</li>
+          <li>Know a missing official? Use <strong>Add an Official</strong> at the bottom of results.</li>
+        </ul>
+        <p class="help-modal-footer">
+          All data comes from public government sources. No account or login required.
+        </p>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+
+    const close = () => {
+      overlay.style.opacity = '0';
+      overlay.addEventListener('transitionend', () => overlay.remove(), { once: true });
+    };
+
+    document.getElementById('help-close').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); }, { once: true });
+  }
+
+  // Trigger via nav button
+  document.getElementById('help-nav-btn').addEventListener('click', _openHelp);
+
+  // Trigger via typing "help" (outside input fields)
   (() => {
-    const SEQ = 'june';
+    const SEQ = 'help';
     let _buf = '';
     document.addEventListener('keydown', e => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
       _buf = (_buf + e.key.toLowerCase()).slice(-SEQ.length);
       if (_buf !== SEQ) return;
       _buf = '';
-
-      const toast = document.createElement('div');
-      toast.textContent = '❤️ This site is dedicated to those I love, and the memory of June the cat.🐈‍⬛';
-      Object.assign(toast.style, {
-        position: 'fixed', bottom: '2rem', left: '50%',
-        transform: 'translateX(-50%)',
-        background: '#1a202c', color: '#fff',
-        padding: '0.75rem 1.5rem', borderRadius: '9999px',
-        fontSize: '1rem', fontFamily: 'inherit',
-        boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
-        zIndex: '9999', opacity: '0',
-        transition: 'opacity 0.4s ease',
-        whiteSpace: 'nowrap',
-      });
-      document.body.appendChild(toast);
-      requestAnimationFrame(() => { toast.style.opacity = '1'; });
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.addEventListener('transitionend', () => toast.remove());
-      }, 3000);
+      _openHelp();
     });
   })();
 
+  // ── Dark mode toggle ─────────────────────────────────────────────────────
+  const themeToggle = document.getElementById('theme-toggle');
+  function _updateThemeBtn() {
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    themeToggle.textContent = dark ? '☀️' : '🌙';
+    themeToggle.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+  }
+  _updateThemeBtn();
+  themeToggle.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('lv-theme', next);
+    _updateThemeBtn();
+  });
+  // Keep in sync if system preference changes and user hasn't manually overridden
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+    if (!localStorage.getItem('lv-theme')) {
+      document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+      _updateThemeBtn();
+    }
+  });
+
   SubmitForm.init();
 
-  // View toggle — wire once; MapView keeps track of state
+  // View toggle - wire once; MapView keeps track of state
   document.getElementById('btn-cards').addEventListener('click', () => MapView.showCards());
   document.getElementById('btn-map').addEventListener('click',   () => MapView.show());
 
-  // Share button — native share on mobile, clipboard fallback on desktop
+  // Share button - native share on mobile, clipboard fallback on desktop
   shareBtn?.addEventListener('click', async () => {
     const url  = location.href;
     const title = document.title;
@@ -87,7 +142,7 @@
           if (!result) throw new Error(
             'Could not determine your ZIP code from your location. Please type it instead.'
           );
-          // Hold coords in memory — this is the only place they are ever stored
+          // Hold coords in memory - this is the only place they are ever stored
           _locationCoords = { lat, lng };
           input.value = result.zip;
           locationLabel.textContent = `Near ${result.city}, ${result.state}`;
@@ -214,7 +269,7 @@
     if (officials.length === 0) {
       UI.showError(
         `No officials found for ZIP ${zip}. ` +
-        `The data sources may be temporarily unavailable — please try again in a moment.`
+        `The data sources may be temporarily unavailable - please try again in a moment.`
       );
       return;
     }
@@ -228,7 +283,7 @@
   }
 
   function _updateMeta(city, stateAbbr, zip) {
-    const t = `ZIP ${zip} — ${city}, ${stateAbbr} Representatives | LocalVotes`;
+    const t = `ZIP ${zip} - ${city}, ${stateAbbr} Representatives | LocalVotes`;
     const d = `Every elected official for ZIP ${zip} (${city}, ${stateAbbr}): Congress, state, governor, school board, and more.`;
     document.title = t;
     [

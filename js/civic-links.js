@@ -1,4 +1,4 @@
-// civic-links.js — state voter registration, polling place lookups, and election dates.
+// civic-links.js - state voter registration, polling place lookups, and election dates.
 // URLs point to official state/federal government pages.
 
 const CivicLinks = (() => {

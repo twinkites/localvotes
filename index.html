@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="LocalVotes — Look up every elected official representing your ZIP code, from Congress to your local school board." />
+  <meta name="description" content="LocalVotes - Look up every elected official representing your ZIP code, from Congress to your local school board." />
   <meta property="og:type"        content="website" />
-  <meta property="og:title"       content="LocalVotes — Know Who Represents You" />
-  <meta property="og:description" content="Look up every elected official from your ZIP code — Congress, state legislature, governor, school board, and more." />
+  <meta property="og:title"       content="LocalVotes - Know Who Represents You" />
+  <meta property="og:description" content="Look up every elected official from your ZIP code - Congress, state legislature, governor, school board, and more." />
   <meta property="og:url"         content="https://twinkites.github.io/localvotes/" />
   <meta name="twitter:card"        content="summary" />
-  <meta name="twitter:title"       content="LocalVotes — Know Who Represents You" />
-  <meta name="twitter:description" content="Look up every elected official from your ZIP code — Congress, state legislature, governor, school board, and more." />
+  <meta name="twitter:title"       content="LocalVotes - Know Who Represents You" />
+  <meta name="twitter:description" content="Look up every elected official from your ZIP code - Congress, state legislature, governor, school board, and more." />
   <meta name="theme-color" content="#1a56db" />
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'none';
@@ -34,8 +34,9 @@
     form-action 'self';
     upgrade-insecure-requests;
   " />
-  <title>LocalVotes — Know Who Represents You</title>
+  <title>LocalVotes - Know Who Represents You</title>
   <link rel="stylesheet" href="css/style.css" />
+  <script src="js/theme.js"></script>
   <noscript>
     <style>.hero,.results-section,.loading-wrap { display: none !important; }</style>
   </noscript>
@@ -49,7 +50,7 @@
   ============================================================ -->
   <header class="site-header" role="banner">
     <div class="container header-inner">
-      <a href="/" class="logo" aria-label="LocalVotes — home">
+      <a href="/" class="logo" aria-label="LocalVotes - home">
         <svg class="logo-icon" aria-hidden="true" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="20" cy="20" r="19" stroke="currentColor" stroke-width="2"/>
           <path d="M12 20l5 5 11-11" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -59,6 +60,8 @@
       <nav class="site-nav" aria-label="Site navigation">
         <a href="#about" class="nav-link">About</a>
         <a href="#sources" class="nav-link">Data Sources</a>
+        <button id="help-nav-btn" class="nav-link">Help</button>
+        <button id="theme-toggle" class="nav-link" aria-label="Toggle dark mode">🌙</button>
       </nav>
     </div>
   </header>
@@ -69,7 +72,7 @@
   <noscript>
     <div style="max-width:600px;margin:3rem auto;padding:1.5rem 2rem;background:#fff5f5;border:1px solid #fc8181;border-radius:8px;font-family:sans-serif;color:#742a2a;">
       <strong>JavaScript is required.</strong>
-      LocalVotes fetches live civic data from government APIs — it needs JavaScript to run.
+      LocalVotes fetches live civic data from government APIs - it needs JavaScript to run.
       Please enable JavaScript in your browser and reload the page.
     </div>
   </noscript>
@@ -124,11 +127,11 @@
             </p>
           </form>
 
-          <!-- Location status — shown only after geolocation is used -->
+          <!-- Location status - shown only after geolocation is used -->
           <div id="location-status" class="location-status hidden" role="status" aria-live="polite">
             <span class="location-icon" aria-hidden="true">📍</span>
             <span id="location-label" class="location-label"></span>
-            <span class="location-privacy">Coordinates are held in browser memory only — never saved or sent to our servers.</span>
+            <span class="location-privacy">Coordinates are held in browser memory only - never saved or sent to our servers.</span>
             <button
               type="button"
               id="delete-location-btn"
@@ -183,7 +186,7 @@
           </div>
         </div>
 
-        <!-- District context panel — populated by UI.renderDistrictPanel() -->
+        <!-- District context panel - populated by UI.renderDistrictPanel() -->
         <div id="district-panel" class="district-panel hidden" aria-label="Your districts"></div>
 
         <!-- Card / Map view toggle -->
@@ -213,7 +216,7 @@
         <!-- Officials grid -->
         <div id="officials-grid" class="officials-grid" aria-label="Official cards" aria-live="polite" aria-atomic="false"></div>
 
-        <!-- Civic action tools — populated by UI.renderCivicTools() -->
+        <!-- Civic action tools - populated by UI.renderCivicTools() -->
         <div id="civic-tools" class="civic-tools hidden" aria-label="Civic action tools"></div>
 
         <!-- Add official prompt -->
@@ -246,12 +249,12 @@
           <div class="about-card">
             <div class="about-icon" aria-hidden="true">🏛️</div>
             <h3>Every Level of Government</h3>
-            <p>Federal, state, county, city, and special districts — all in one place, from a single ZIP code lookup.</p>
+            <p>Federal, state, county, city, and special districts - all in one place, from a single ZIP code lookup.</p>
           </div>
           <div class="about-card">
             <div class="about-icon" aria-hidden="true">📊</div>
             <h3>Voting Records</h3>
-            <p>Federal legislators include ProPublica voting-record data — party-line percentage, missed votes, and more.</p>
+            <p>Federal legislators include ProPublica voting-record data - party-line percentage, missed votes, and more.</p>
           </div>
           <div class="about-card">
             <div class="about-icon" aria-hidden="true">💰</div>
@@ -371,55 +374,55 @@
             <a href="https://www.propublica.org/datastore/api/propublica-congress-api" target="_blank" rel="noopener noreferrer">
               ProPublica Congress API
             </a>
-            — federal senators &amp; House reps, voting records, committees
+            - federal senators &amp; House reps, voting records, committees
           </li>
           <li>
             <a href="https://openstates.org/api/v3/" target="_blank" rel="noopener noreferrer">
               OpenStates API
             </a>
-            — state legislators by location
+            - state legislators by location
           </li>
           <li>
             <a href="https://query.wikidata.org" target="_blank" rel="noopener noreferrer">
               Wikidata SPARQL
             </a>
-            — statewide executives (Governor, AG, and more)
+            - statewide executives (Governor, AG, and more)
           </li>
           <li>
             <a href="https://geocoding.geo.census.gov" target="_blank" rel="noopener noreferrer">
               US Census Geocoder
             </a>
-            — congressional district lookup &amp; reverse geocoding
+            - congressional district lookup &amp; reverse geocoding
           </li>
           <li>
             <a href="https://tigerweb.geo.census.gov" target="_blank" rel="noopener noreferrer">
               Census TIGERweb
             </a>
-            — district boundaries, school district &amp; county lookup
+            - district boundaries, school district &amp; county lookup
           </li>
           <li>
             <a href="https://nominatim.openstreetmap.org" target="_blank" rel="noopener noreferrer">
               Nominatim (OpenStreetMap)
             </a>
-            — reverse geocoding fallback
+            - reverse geocoding fallback
           </li>
           <li>
             <a href="https://api.open.fec.gov" target="_blank" rel="noopener noreferrer">
               FEC Open Data
             </a>
-            — federal campaign finance
+            - federal campaign finance
           </li>
           <li>
             <a href="https://api.congress.gov" target="_blank" rel="noopener noreferrer">
               Congress.gov API
             </a>
-            — sponsored legislation
+            - sponsored legislation
           </li>
           <li>
             <a href="https://api.zippopotam.us" target="_blank" rel="noopener noreferrer">
               Zippopotam.us
             </a>
-            — ZIP → coordinates
+            - ZIP → coordinates
           </li>
         </ul>
       </div>
@@ -459,7 +462,7 @@
   </footer>
 
   <!-- ============================================================
-       SCRIPTS — order matters
+       SCRIPTS - order matters
   ============================================================ -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN2GNnU=" crossorigin=""></script>

@@ -77,7 +77,7 @@ const GeoAPI = (() => {
     }
   }
 
-  // Fallback: Nominatim (OpenStreetMap reverse geocoder — free, no key).
+  // Fallback: Nominatim (OpenStreetMap reverse geocoder - free, no key).
   // Usage policy: max 1 req/s, must not scrape. One call per user action is fine.
   async function _nominatimReverseGeocode(lat, lng) {
     try {
