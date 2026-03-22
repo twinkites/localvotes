@@ -211,7 +211,7 @@
         <div id="map-container" class="map-container hidden" role="region" aria-label="Representatives map"></div>
 
         <!-- Officials grid -->
-        <div id="officials-grid" class="officials-grid" aria-label="Official cards"></div>
+        <div id="officials-grid" class="officials-grid" aria-label="Official cards" aria-live="polite" aria-atomic="false"></div>
 
         <!-- Civic action tools — populated by UI.renderCivicTools() -->
         <div id="civic-tools" class="civic-tools hidden" aria-label="Civic action tools"></div>
@@ -285,11 +285,11 @@
         <div class="sf-row sf-row-2">
           <div class="sf-field">
             <label for="sf-name" class="sf-label">Full Name <span class="sf-required">*</span></label>
-            <input id="sf-name" name="sf-name" type="text" class="sf-input" placeholder="Jane Smith" required autocomplete="off">
+            <input id="sf-name" name="sf-name" type="text" class="sf-input" placeholder="Jane Smith" required aria-required="true" autocomplete="off">
           </div>
           <div class="sf-field">
             <label for="sf-office" class="sf-label">Office / Title <span class="sf-required">*</span></label>
-            <input id="sf-office" name="sf-office" type="text" class="sf-input" placeholder="City Council Member, District 4" required>
+            <input id="sf-office" name="sf-office" type="text" class="sf-input" placeholder="City Council Member, District 4" required aria-required="true">
           </div>
         </div>
 
@@ -309,7 +309,7 @@
           </div>
           <div class="sf-field">
             <label for="sf-zip" class="sf-label">ZIP Code <span class="sf-required">*</span></label>
-            <input id="sf-zip" name="sf-zip" type="text" class="sf-input" placeholder="90210" maxlength="5" required>
+            <input id="sf-zip" name="sf-zip" type="text" class="sf-input" placeholder="90210" maxlength="5" required aria-required="true">
           </div>
         </div>
 

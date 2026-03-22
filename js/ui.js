@@ -207,7 +207,7 @@ const UI = (() => {
         </div>
 
         ${hasDetails ? `
-          <button class="expand-btn" data-card-id="${cardId}">
+          <button class="expand-btn" data-card-id="${cardId}" aria-expanded="false" aria-controls="${cardId}">
             View Policy &amp; Finance Data ▾
           </button>
           <div id="${cardId}" class="card-details hidden">
@@ -227,9 +227,11 @@ const UI = (() => {
     const btn = el?.previousElementSibling;
     if (!el) return;
     el.classList.toggle('hidden');
-    if (btn) btn.textContent = el.classList.contains('hidden')
-      ? 'View Policy & Finance Data ▾'
-      : 'Hide Details ▴';
+    const isHidden = el.classList.contains('hidden');
+    if (btn) {
+      btn.textContent = isHidden ? 'View Policy & Finance Data ▾' : 'Hide Details ▴';
+      btn.setAttribute('aria-expanded', isHidden ? 'false' : 'true');
+    }
   }
 
   function renderLocalOfficials(localData) {
@@ -312,7 +314,7 @@ const UI = (() => {
     const tabs = document.getElementById('level-tabs');
     const levels = ['All', ...Object.keys(levelCounts)];
     tabs.innerHTML = levels.map((l, i) =>
-      `<button class="tab-pill ${i === 0 ? 'active' : ''}" data-level="${esc(l)}">
+      `<button class="tab-pill ${i === 0 ? 'active' : ''}" data-level="${esc(l)}" aria-pressed="${i === 0 ? 'true' : 'false'}">
         ${esc(l)} ${l === 'All' ? `(${current.length})` : `(${levelCounts[l]})`}
       </button>`
     ).join('');
@@ -371,8 +373,12 @@ const UI = (() => {
   }
 
   function filterByLevel(level, btn) {
-    document.querySelectorAll('.tab-pill').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pill').forEach(t => {
+      t.classList.remove('active');
+      t.setAttribute('aria-pressed', 'false');
+    });
     btn.classList.add('active');
+    btn.setAttribute('aria-pressed', 'true');
     document.querySelectorAll('#officials-grid .official-card').forEach(card => {
       card.style.display = (level === 'All' || card.dataset.level === level) ? '' : 'none';
     });

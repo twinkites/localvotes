@@ -854,6 +854,7 @@ button {
    12. ABOUT SECTION
 --------------------------------------------------------------- */
 .about-section {
+  scroll-margin-top: 68px;
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);
@@ -925,6 +926,7 @@ button {
    13. FOOTER
 --------------------------------------------------------------- */
 .site-footer {
+  scroll-margin-top: 68px;
   background: var(--color-text);
   color: rgba(255, 255, 255, 0.75);
 }
@@ -1060,6 +1062,11 @@ button {
 
   .header-inner {
     height: 52px;
+  }
+
+  .about-section,
+  .site-footer {
+    scroll-margin-top: 60px;
   }
 
   .logo-text {
