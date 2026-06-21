@@ -5,8 +5,9 @@
   const locationStatus    = document.getElementById('location-status');
   const locationLabel     = document.getElementById('location-label');
   const deleteLocationBtn = document.getElementById('delete-location-btn');
-  const shareBtn = document.getElementById('share-btn');
-  const printBtn = document.getElementById('print-btn');
+  const shareBtn       = document.getElementById('share-btn');
+  const printBtn       = document.getElementById('print-btn');
+  const cheatsheetBtn  = document.getElementById('cheatsheet-btn');
 
   // In-memory location state - never written to localStorage, cookies, or any server.
   // Nulled immediately when the user deletes location data or edits the ZIP manually.
@@ -100,6 +101,31 @@
 
   SubmitForm.init();
 
+  // Register service worker for offline app-shell caching (silent fail).
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+
+  // Show/hide offline banner based on navigator.onLine.
+  function _updateOfflineBanner() {
+    const existing = document.getElementById('offline-banner');
+    if (!navigator.onLine) {
+      if (!existing) {
+        const banner = document.createElement('div');
+        banner.id = 'offline-banner';
+        banner.className = 'offline-banner';
+        banner.setAttribute('role', 'status');
+        banner.textContent = '⚠ You appear to be offline. Live data is unavailable. Results shown may be from cache.';
+        document.querySelector('.site-header')?.insertAdjacentElement('afterend', banner);
+      }
+    } else {
+      existing?.remove();
+    }
+  }
+  window.addEventListener('online',  _updateOfflineBanner);
+  window.addEventListener('offline', _updateOfflineBanner);
+  _updateOfflineBanner();
+
   // View toggle - wire once; MapView keeps track of state
   document.getElementById('btn-cards').addEventListener('click', () => MapView.showCards());
   document.getElementById('btn-map').addEventListener('click',   () => MapView.show());
@@ -123,6 +149,15 @@
   });
 
   printBtn?.addEventListener('click', () => window.print());
+
+  cheatsheetBtn?.addEventListener('click', () => {
+    document.documentElement.setAttribute('data-print-mode', 'cheatsheet');
+    window.print();
+    // Remove after print dialog closes (or immediately on cancel).
+    window.addEventListener('afterprint', () => {
+      document.documentElement.removeAttribute('data-print-mode');
+    }, { once: true });
+  });
 
   // ── Geolocation ─────────────────────────────────────────────────────────
 
@@ -246,14 +281,30 @@
     const district = geoCtx.congressionalDistrict;
     Object.assign(geo, geoCtx);
 
-    // Step 3: Fetch federal, state, statewide executive, and school board officials in parallel
-    const [federalOfficials, stateOfficials, statewideOfficials, schoolBoardOfficials, cityCouncilOfficials] = await Promise.all([
+    // Step 3: Fetch officials and voter info in parallel
+    // Google Civic API expects city-first format: "City, ST ZIP"
+    const address = `${geo.city}, ${geo.stateAbbr} ${zip}`;
+    const [
+      federalOfficials,
+      stateOfficials,
+      statewideOfficials,
+      schoolBoardOfficials,
+      cityCouncilOfficials,
+      voterInfo,
+    ] = await Promise.all([
       FederalAPI.getOfficials(geo.stateAbbr, district),
       OpenStatesAPI.getOfficials(geo.lat, geo.lng),
       StatewideAPI.getOfficials(geo.stateAbbr),
       SchoolBoards.lookup(geo.city, geo.stateAbbr),
       CityCouncil.lookup(geo.city, geo.stateAbbr),
+      CivicInfo.getVoterInfo(address, geo.stateAbbr),
     ]);
+
+    // Surface OpenStates rate-limit warnings early so the user knows data is incomplete.
+    const openStatesError = OpenStatesAPI.getLastError();
+    if (openStatesError?.type === 'rate_limit') {
+      UI.showError(openStatesError.message);
+    }
 
     const officials = [...federalOfficials, ...statewideOfficials, ...stateOfficials, ...schoolBoardOfficials, ...cityCouncilOfficials];
 
@@ -261,6 +312,7 @@
     await Promise.all(officials.map(o => Promise.all([
       FECAPI.enrich(o),
       CongressAPI.enrich(o),
+      OpenStatesAPI.enrich(o),
     ])));
 
     SubmitForm.setZip(zip);
@@ -276,7 +328,12 @@
 
     UI.renderResults(officials, zip, geo);
     UI.renderDistrictPanel(geo);
-    UI.renderCivicTools(geo);
+    UI.renderCivicTools(geo, voterInfo);
+
+    // Render ballot measures if the Google Civic API returned any
+    const ballotMeasures = CivicInfo.extractBallotMeasures(voterInfo);
+    if (ballotMeasures.length) UI.renderBallotMeasures(ballotMeasures);
+
     _updateMeta(geo.city, geo.stateAbbr, zip);
     MapView.init(officials.filter(o => !o.historical), geo, district);
     document.getElementById('results').scrollIntoView({ behavior: 'smooth' });

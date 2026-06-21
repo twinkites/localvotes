@@ -75,17 +75,10 @@ const CivicLinks = (() => {
     WI: 'https://myvote.wi.gov/en-us/FindMyPollingPlace',
   };
 
-  const NEXT_ELECTION = {
-    date: 'November 3, 2026',
-    label: 'Midterm Elections',
-    detail: 'All 435 House seats · 33 Senate seats · 36 governors',
-  };
-
   function get(stateAbbr) {
     return {
       registerUrl: REG_URLS[stateAbbr] || 'https://vote.gov/register',
       pollUrl:     POLL_URLS[stateAbbr] || 'https://vote.gov/find-your-polling-place',
-      election:    NEXT_ELECTION,
     };
   }
 

@@ -10,6 +10,9 @@ const OpenStatesAPI = (() => {
     'Nonpartisan': 'Nonpartisan',
   };
 
+  // Exposed so app.js can surface a user-facing notice when a rate limit is hit.
+  let _lastError = null;
+
   function normalizeOfficial(person) {
     const role = person.current_role || {};
     const chamber = role.org_classification || '';
@@ -54,23 +57,62 @@ const OpenStatesAPI = (() => {
       address,
       channels: [],
       openStatesProfile: `https://ballotpedia.org/${encodeURIComponent(person.name.trim().replace(/\s+/g, '_'))}`,
+      openStatesId: person.id || null,
+      _fetchedAt: Date.now(),
     };
   }
 
   async function getOfficials(lat, lng) {
+    _lastError = null;
     const key = CONFIG.OPENSTATES_API_KEY;
     if (!key) return [];
     try {
       const res = await fetch(
         `${BASE}/people.geo?lat=${lat}&lng=${lng}&apikey=${key}`
       );
-      if (!res.ok) return [];
+      if (res.status === 429) {
+        _lastError = {
+          type: 'rate_limit',
+          message: 'OpenStates rate limit reached. State legislator data is temporarily unavailable — please wait a moment and try again.',
+        };
+        return [];
+      }
+      if (!res.ok) {
+        _lastError = { type: 'api_error', message: 'State legislator data temporarily unavailable.' };
+        return [];
+      }
       const data = await res.json();
       return (data.results || []).map(normalizeOfficial);
     } catch {
+      _lastError = { type: 'network_error', message: 'Could not reach OpenStates. Check your connection and try again.' };
       return [];
     }
   }
 
-  return { getOfficials };
+  function getLastError() { return _lastError; }
+
+  // Fetch recently sponsored bills for a state legislator via the OpenStates bills endpoint.
+  async function enrich(official) {
+    if (official.level !== 'State' || !official.openStatesId) return official;
+    const key = CONFIG.OPENSTATES_API_KEY;
+    if (!key) return official;
+    try {
+      const res = await fetch(
+        `${BASE}/bills?sponsor=${encodeURIComponent(official.openStatesId)}&sort=updated_at&per_page=5&apikey=${key}`
+      );
+      if (!res.ok) return official;
+      const data = await res.json();
+      const bills = (data.results || []).map(b => ({
+        label:        b.identifier,
+        title:        b.title,
+        url:          b.openstates_url || b.sources?.[0]?.url || '',
+        introducedDate: b.first_action_date ? b.first_action_date.slice(0, 10) : '',
+        latestAction: b.latest_action_description || '',
+      }));
+      if (bills.length) official.stateBills = bills;
+    } catch { /* silent fail */ }
+    return official;
+  }
+
+  return { getOfficials, getLastError, enrich };
 })();

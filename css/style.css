@@ -2351,3 +2351,362 @@ html[data-theme="dark"] .committee-side.minority { background: #2d1515; color: #
   margin-top: var(--space-4);
   opacity: 0.75;
 }
+
+/* ---------------------------------------------------------------
+   RE-ELECTION BADGES (Feature 2)
+--------------------------------------------------------------- */
+.running-badge {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+
+.retiring-badge {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+}
+
+html[data-theme="dark"] .running-badge  { background: #064e3b; color: #6ee7b7; border-color: #065f46; }
+html[data-theme="dark"] .retiring-badge { background: #1f2937; color: #9ca3af; border-color: #374151; }
+
+/* ---------------------------------------------------------------
+   DATA WARNING (Feature 7)
+--------------------------------------------------------------- */
+.data-warning {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: #fffbeb;
+  border: 1px solid #fbbf24;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  color: #92400e;
+}
+
+html[data-theme="dark"] .data-warning {
+  background: #1c1508;
+  border-color: #b45309;
+  color: #fcd34d;
+}
+
+/* ---------------------------------------------------------------
+   SOURCE BADGE FRESHNESS (Feature 6)
+--------------------------------------------------------------- */
+.source-badge[title] {
+  cursor: help;
+  text-decoration: underline dotted;
+}
+
+/* ---------------------------------------------------------------
+   ELECTION TIMELINE (Feature 1)
+--------------------------------------------------------------- */
+.election-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
+}
+
+.election-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.election-row.past {
+  opacity: 0.55;
+}
+
+.election-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.election-dot.upcoming {
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.election-dot.reg {
+  background: #d97706;
+}
+
+.election-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.election-item-label {
+  font-weight: var(--font-medium);
+  color: var(--color-text-muted);
+}
+
+.election-item-date {
+  color: var(--color-text);
+}
+
+.election-disclaimer {
+  font-size: 0.7rem !important;
+  opacity: 0.7;
+  margin-top: var(--space-1);
+}
+
+html[data-theme="dark"] .election-dot.upcoming {
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.25);
+}
+
+/* ---------------------------------------------------------------
+   BALLOT MEASURES SECTION (Feature 3)
+--------------------------------------------------------------- */
+.ballot-measures-section {
+  margin-top: var(--space-8);
+  padding: var(--space-6) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.ballot-measures-inner {
+  max-width: 860px;
+}
+
+.ballot-measures-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semi);
+  margin-bottom: var(--space-4);
+}
+
+.ballot-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ballot-item {
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.ballot-item-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-weight: var(--font-semi);
+  margin-bottom: var(--space-1);
+}
+
+.ballot-district {
+  font-size: var(--text-xs);
+  font-weight: var(--font-normal);
+  padding: 1px var(--space-2);
+  background: var(--color-bg-alt);
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.ballot-subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.ballot-desc {
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+  line-height: var(--leading-relaxed);
+}
+
+.ballot-more-link {
+  display: inline-block;
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+html[data-theme="dark"] .ballot-item { background: var(--color-surface); }
+html[data-theme="dark"] .ballot-district { background: #2d3748; }
+
+/* ---------------------------------------------------------------
+   CIVIC TOOL — POLLING PLACE LIVE RESULT (Feature 5)
+--------------------------------------------------------------- */
+.civic-tool-polling {
+  border-left: 3px solid var(--color-primary);
+}
+
+/* ---------------------------------------------------------------
+   BALLOT CHEAT SHEET — PRINT MODE (Feature 15)
+--------------------------------------------------------------- */
+[data-print-mode="cheatsheet"] .site-header,
+[data-print-mode="cheatsheet"] .hero,
+[data-print-mode="cheatsheet"] .filter-bar,
+[data-print-mode="cheatsheet"] .view-toggle,
+[data-print-mode="cheatsheet"] .map-container,
+[data-print-mode="cheatsheet"] .about-section,
+[data-print-mode="cheatsheet"] .site-footer,
+[data-print-mode="cheatsheet"] .search-section,
+[data-print-mode="cheatsheet"] .expand-btn,
+[data-print-mode="cheatsheet"] .add-official-bar,
+[data-print-mode="cheatsheet"] .local-officials-section,
+[data-print-mode="cheatsheet"] .ballot-measures-section,
+[data-print-mode="cheatsheet"] .civic-tools,
+[data-print-mode="cheatsheet"] .channels,
+[data-print-mode="cheatsheet"] .contact-panel,
+[data-print-mode="cheatsheet"] .card-details,
+[data-print-mode="cheatsheet"] .results-header-actions,
+[data-print-mode="cheatsheet"] .district-panel,
+[data-print-mode="cheatsheet"] .data-warning {
+  display: none !important;
+}
+
+@media print {
+  [data-print-mode="cheatsheet"] #officials-grid {
+    display: flex !important;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  [data-print-mode="cheatsheet"] .results-title {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  [data-print-mode="cheatsheet"] .official-card {
+    display: flex !important;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    box-shadow: none;
+    border: none;
+    border-bottom: 1px solid #e2e8f0;
+    border-radius: 0;
+    break-inside: avoid;
+  }
+
+  [data-print-mode="cheatsheet"] .party-bar { width: 4px; height: 2rem; border-radius: 2px; flex-shrink: 0; }
+  [data-print-mode="cheatsheet"] .official-photo,
+  [data-print-mode="cheatsheet"] .official-avatar { display: none !important; }
+
+  [data-print-mode="cheatsheet"] .card-body { display: flex; flex-direction: row; align-items: center; gap: 0.75rem; flex: 1; }
+  [data-print-mode="cheatsheet"] .card-header { flex: 1; }
+  [data-print-mode="cheatsheet"] .card-title h3 { font-size: 0.8rem; margin: 0; }
+  [data-print-mode="cheatsheet"] .office-name { font-size: 0.7rem; color: #4a5568; margin: 0; }
+  [data-print-mode="cheatsheet"] .badges { margin-top: 0.15rem; }
+  [data-print-mode="cheatsheet"] .badge { font-size: 0.6rem; padding: 1px 4px; }
+  [data-print-mode="cheatsheet"] .running-badge { display: inline !important; }
+
+  [data-print-mode="cheatsheet"] .card-contact { display: none !important; }
+
+  [data-print-mode="cheatsheet"]::before {
+    content: "LocalVotes — Ballot Cheat Sheet";
+    display: block;
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* ---------------------------------------------------------------
+   OFFLINE BANNER
+--------------------------------------------------------------- */
+.offline-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: #fffbeb;
+  border-bottom: 1px solid #fbbf24;
+  font-size: var(--text-sm);
+  color: #92400e;
+  position: sticky;
+  top: 60px;
+  z-index: 90;
+}
+
+html[data-theme="dark"] .offline-banner {
+  background: #1c1508;
+  border-color: #b45309;
+  color: #fcd34d;
+}
+
+/* ---------------------------------------------------------------
+   CHALLENGERS
+--------------------------------------------------------------- */
+.challenger-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.challenger-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-alt);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+html[data-theme="dark"] .challenger-item {
+  background: rgba(255,255,255,0.05);
+}
+
+.challenger-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.challenger-name {
+  font-weight: var(--font-medium);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.challenger-party {
+  color: var(--color-text-subtle);
+  font-size: var(--text-xs);
+}
+
+.challenger-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.challenger-raised {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.challenger-fec-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: var(--font-medium);
+  white-space: nowrap;
+}
+
+.challenger-fec-link:hover {
+  text-decoration: underline;
+}

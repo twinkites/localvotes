@@ -26,7 +26,8 @@
                 https://tigerweb.geo.census.gov
                 https://nominatim.openstreetmap.org
                 https://query.wikidata.org
-                https://docs.google.com;
+                https://docs.google.com
+                https://www.googleapis.com;
     img-src     'self' data: https:;
     font-src    'self';
     object-src  'none';
@@ -182,6 +183,7 @@
           <div class="results-header-actions">
             <button type="button" id="share-btn" class="results-action-btn">Share</button>
             <button type="button" id="print-btn" class="results-action-btn">Print</button>
+            <button type="button" id="cheatsheet-btn" class="results-action-btn">🗳 Ballot Cheat Sheet</button>
             <a href="#" id="search-again" class="search-again-link" aria-label="Search a different ZIP code">← Search Again</a>
           </div>
         </div>
@@ -465,8 +467,10 @@
        SCRIPTS - order matters
   ============================================================ -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN2GNnU=" crossorigin=""></script>
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="config.js"></script>
+  <script src="js/elections.js"></script>
+  <script src="js/civic-info.js"></script>
   <script src="js/geo.js"></script>
   <script src="js/federal.js"></script>
   <script src="js/openstates.js"></script>

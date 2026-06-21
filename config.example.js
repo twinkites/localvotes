@@ -20,4 +20,9 @@ const CONFIG = {
   // Optional: Congress.gov API key (sponsored legislation for federal officials)
   // Free - register at https://api.congress.gov/sign-up/
   CONGRESS_API_KEY: 'YOUR_CONGRESS_API_KEY',
+
+  // Optional: Google Civic Information API key (live polling places + ballot measures)
+  // Free tier covers typical usage - enable "Google Civic Information API" at:
+  // https://console.cloud.google.com/ then create an API key
+  GOOGLE_CIVIC_API_KEY: 'YOUR_GOOGLE_CIVIC_API_KEY',
 };

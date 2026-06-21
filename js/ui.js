@@ -78,11 +78,18 @@ const UI = (() => {
     </div>`;
   }
 
+  function _freshness(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return ` title="Data retrieved ${label}"`;
+  }
+
   function renderVotingRecord(vr) {
     if (!vr) return '';
     return `
       <div class="detail-section">
-        <h4>Voting Record <span class="source-badge">ProPublica</span></h4>
+        <h4>Voting Record <span class="source-badge"${_freshness(vr._fetchedAt)}>ProPublica</span></h4>
         <div class="stat-row">
           <span class="stat-label">Votes with Party</span>
           <span class="stat-value">${esc(vr.votesWithPartyPct ?? 'N/A')}%</span>
@@ -95,11 +102,12 @@ const UI = (() => {
       </div>`;
   }
 
-  function renderSponsoredBills(bills) {
+  function renderSponsoredBills(bills, source = 'Congress.gov') {
     if (!bills?.length) return '';
+    const title = source === 'OpenStates' ? 'Recently Sponsored Bills' : 'Recently Sponsored Legislation';
     return `
       <div class="detail-section">
-        <h4>Recently Sponsored Legislation <span class="source-badge">Congress.gov</span></h4>
+        <h4>${title} <span class="source-badge">${esc(source)}</span></h4>
         <ul class="bills-list">
           ${bills.slice(0, 6).map(b => {
             const action = b.latestAction
@@ -122,6 +130,27 @@ const UI = (() => {
       </div>`;
   }
 
+  function renderChallengers(challengers) {
+    if (!challengers?.length) return '';
+    return `
+      <div class="detail-section">
+        <h4>2026 Challengers <span class="source-badge">FEC</span></h4>
+        <ul class="challenger-list">
+          ${challengers.map(c => `
+            <li class="challenger-item">
+              <div class="challenger-info">
+                <span class="challenger-name">${esc(c.name)}</span>
+                <span class="challenger-party">${esc(c.party)}</span>
+              </div>
+              <div class="challenger-right">
+                ${c.totalRaised ? `<span class="challenger-raised">${formatCurrency(c.totalRaised)}</span>` : ''}
+                <a href="${safeUrl(c.fecUrl)}" target="_blank" rel="noopener noreferrer" class="challenger-fec-link">FEC →</a>
+              </div>
+            </li>`).join('')}
+        </ul>
+      </div>`;
+  }
+
   function renderOpenStatesProfile(url) {
     if (!url) return '';
     return `
@@ -135,7 +164,7 @@ const UI = (() => {
     if (!cf) return '';
     return `
       <div class="detail-section">
-        <h4>Campaign Finance <span class="source-badge">FEC</span></h4>
+        <h4>Campaign Finance <span class="source-badge"${_freshness(cf._fetchedAt)}>FEC</span></h4>
         <div class="stat-row">
           <span class="stat-label">Total Raised</span>
           <span class="stat-value">${formatCurrency(cf.totalRaised)}</span>
@@ -167,7 +196,8 @@ const UI = (() => {
     const partyColor = getPartyColor(official.party);
     const levelColor = LEVEL_COLORS[official.level] || '#1a202c';
     const hasDetails = official.votingRecord || official.campaignFinance
-      || official.sponsoredBills || official.openStatesProfile || official.committees;
+      || official.sponsoredBills || official.stateBills || official.challengers
+      || official.openStatesProfile || official.committees;
     const cardId = `official-${Math.random().toString(36).slice(2)}`;
 
     const addressStr = official.address[0]
@@ -193,6 +223,10 @@ const UI = (() => {
             <div class="badges">
               <span class="badge level-badge" style="background:${levelColor}">${esc(official.level)}</span>
               <span class="badge party-badge" style="background:${partyColor}">${esc(official.party || 'Unknown')}</span>
+              ${official.isRunning2026 === true  ? '<span class="badge running-badge" title="Has filed with the FEC as a 2026 candidate">Running 2026</span>' : ''}
+              ${official.isRunning2026 === false && official.level === 'Federal' && official.campaignFinance
+                ? '<span class="badge retiring-badge" title="No active 2026 FEC filing found">Not seeking re-election</span>'
+                : ''}
             </div>
           </div>
         </div>
@@ -203,6 +237,9 @@ const UI = (() => {
           ${official.urls.length ? `<div class="contact-item">🌐 <a href="${safeUrl(official.urls[0])}" target="_blank" rel="noopener noreferrer">Official Website</a></div>` : ''}
           ${addressStr ? `<div class="contact-item">📍 ${addressStr}</div>` : ''}
           ${renderChannels(official.channels)}
+          ${official.level === 'Federal' && official.propublicaId
+            ? `<div class="contact-item">🏛️ <a href="https://www.townhallproject.com/?memberOfCongress=${esc(official.propublicaId)}" target="_blank" rel="noopener noreferrer">Town Halls &amp; Events</a></div>`
+            : ''}
           <div class="contact-item news-link-item">📰 <a href="https://duckduckgo.com/?q=%22${encodeURIComponent(official.name)}%22&ia=news&iax=news" target="_blank" rel="noopener noreferrer">Recent news</a></div>
         </div>
 
@@ -231,6 +268,11 @@ Sincerely,
           </div>
         </div>
 
+        ${official._dataErrors?.length ? `
+          <div class="data-warning" role="alert">
+            ⚠ ${official._dataErrors.map(esc).join(' · ')}
+          </div>` : ''}
+
         ${hasDetails ? `
           <button class="expand-btn" data-card-id="${cardId}" aria-expanded="false" aria-controls="${cardId}">
             View Policy &amp; Finance Data ▾
@@ -239,7 +281,9 @@ Sincerely,
             ${renderVotingRecord(official.votingRecord)}
             ${renderCommittees(official.committees)}
             ${renderSponsoredBills(official.sponsoredBills)}
+            ${renderSponsoredBills(official.stateBills, 'OpenStates')}
             ${renderCampaignFinance(official.campaignFinance)}
+            ${renderChallengers(official.challengers)}
             ${renderOpenStatesProfile(official.openStatesProfile)}
           </div>
         ` : ''}
@@ -471,6 +515,8 @@ Sincerely,
     if (panel) { panel.classList.add('hidden'); panel.innerHTML = ''; }
     const tools = document.getElementById('civic-tools');
     if (tools) { tools.classList.add('hidden'); tools.innerHTML = ''; }
+    const ballot = document.getElementById('ballot-measures-section');
+    if (ballot) ballot.remove();
     hideError();
   }
 
@@ -504,10 +550,91 @@ Sincerely,
     panel.classList.remove('hidden');
   }
 
-  function renderCivicTools(geo) {
+  function renderCivicTools(geo, voterInfo) {
     const section = document.getElementById('civic-tools');
     if (!section) return;
     const links = CivicLinks.get(geo.stateAbbr);
+    const elInfo = Elections.get(geo.stateAbbr);
+    const general = Elections.getGeneral();
+
+    // Live polling place from Google Civic API, if available
+    const pollingPlace = voterInfo ? CivicInfo.extractPollingPlace(voterInfo) : null;
+    const earlyVoteSites = voterInfo ? CivicInfo.extractEarlyVoting(voterInfo) : [];
+
+    const pollingCard = pollingPlace
+      ? `<div class="civic-tool-card civic-tool-polling">
+          <span class="civic-tool-icon" aria-hidden="true">📍</span>
+          <div class="civic-tool-body">
+            <strong>Your Polling Place</strong>
+            <span>${esc(pollingPlace.name)}</span>
+            <span>${esc([pollingPlace.line1, pollingPlace.city, pollingPlace.state].filter(Boolean).join(', '))}</span>
+            ${pollingPlace.hours ? `<span class="civic-tool-detail">Hours: ${esc(pollingPlace.hours)}</span>` : ''}
+          </div>
+        </div>`
+      : `<a href="${safeUrl(links.pollUrl)}" target="_blank" rel="noopener noreferrer" class="civic-tool-card">
+          <span class="civic-tool-icon" aria-hidden="true">📍</span>
+          <div class="civic-tool-body">
+            <strong>Find Your Polling Place</strong>
+            <span>${esc(geo.state)} official lookup</span>
+          </div>
+        </a>`;
+
+    const earlyVoteCard = earlyVoteSites.length
+      ? `<div class="civic-tool-card civic-tool-election">
+          <span class="civic-tool-icon" aria-hidden="true">🗳️</span>
+          <div class="civic-tool-body">
+            <strong>Early Voting Available</strong>
+            <span>${esc(earlyVoteSites[0].name)}</span>
+            ${earlyVoteSites[0].startDate ? `<span class="civic-tool-detail">${esc(earlyVoteSites[0].startDate)} – ${esc(earlyVoteSites[0].endDate || '')}</span>` : ''}
+            ${earlyVoteSites.length > 1 ? `<span class="civic-tool-detail">+${earlyVoteSites.length - 1} more locations</span>` : ''}
+          </div>
+        </div>`
+      : '';
+
+    // Build the election calendar card
+    const elCalendar = elInfo ? `
+      <div class="civic-tool-card civic-tool-election">
+        <span class="civic-tool-icon" aria-hidden="true">🗓️</span>
+        <div class="civic-tool-body">
+          <strong>2026 Election Calendar</strong>
+          <div class="election-timeline">
+            ${elInfo.primaryDate ? `
+              <div class="election-row ${elInfo.primaryPast ? 'past' : ''}">
+                <span class="election-dot"></span>
+                <span class="election-item">
+                  <span class="election-item-label">${elInfo.primaryPast ? '✓ Primary' : 'Primary'}</span>
+                  <span class="election-item-date">${esc(elInfo.primaryDate)}</span>
+                </span>
+              </div>` : ''}
+            <div class="election-row">
+              <span class="election-dot upcoming"></span>
+              <span class="election-item">
+                <span class="election-item-label">General Election</span>
+                <span class="election-item-date">${esc(general.date)}</span>
+              </span>
+            </div>
+            <div class="election-row reg-row">
+              <span class="election-dot reg"></span>
+              <span class="election-item">
+                <span class="election-item-label">Reg. Deadline</span>
+                <span class="election-item-date">${esc(elInfo.regDeadline)}${elInfo.sdr ? ' <em>(SDR)</em>' : ''}</span>
+              </span>
+            </div>
+          </div>
+          ${elInfo.vbm ? '<span class="civic-tool-detail">✉ All voters receive a mail ballot</span>' : ''}
+          ${!elInfo.vbm && elInfo.earlyVoting && !earlyVoteSites.length ? '<span class="civic-tool-detail">In-person early voting available</span>' : ''}
+          <span class="civic-tool-detail election-disclaimer">Verify dates at your state's official site</span>
+        </div>
+      </div>` : `
+      <div class="civic-tool-card civic-tool-election">
+        <span class="civic-tool-icon" aria-hidden="true">🗓️</span>
+        <div class="civic-tool-body">
+          <strong>${esc(general.label)}</strong>
+          <span>${esc(general.date)}</span>
+          <span class="civic-tool-detail">${esc(general.detail)}</span>
+        </div>
+      </div>`;
+
     section.innerHTML = `
       <div class="civic-tools-inner">
         <h3 class="civic-tools-title">Take Action</h3>
@@ -519,25 +646,48 @@ Sincerely,
               <span>${esc(geo.state)} official portal</span>
             </div>
           </a>
-          <a href="${safeUrl(links.pollUrl)}" target="_blank" rel="noopener noreferrer" class="civic-tool-card">
-            <span class="civic-tool-icon" aria-hidden="true">📍</span>
-            <div class="civic-tool-body">
-              <strong>Find Your Polling Place</strong>
-              <span>${esc(geo.state)} official lookup</span>
-            </div>
-          </a>
-          <div class="civic-tool-card civic-tool-election">
-            <span class="civic-tool-icon" aria-hidden="true">🗓️</span>
-            <div class="civic-tool-body">
-              <strong>${esc(links.election.label)}</strong>
-              <span>${esc(links.election.date)}</span>
-              <span class="civic-tool-detail">${esc(links.election.detail)}</span>
-            </div>
-          </div>
+          ${pollingCard}
+          ${earlyVoteCard}
+          ${elCalendar}
         </div>
       </div>`;
     section.classList.remove('hidden');
   }
 
-  return { renderResults, renderLocalOfficials, renderDistrictPanel, renderCivicTools, filterByLevel, toggleDetails, showLoading, showError, hideError, reset };
+  function renderBallotMeasures(measures) {
+    if (!measures?.length) return;
+    let el = document.getElementById('ballot-measures-section');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'ballot-measures-section';
+      el.className = 'ballot-measures-section';
+      const tools = document.getElementById('civic-tools');
+      tools?.parentNode?.insertBefore(el, tools?.nextSibling);
+    }
+    el.innerHTML = `
+      <div class="ballot-measures-inner">
+        <h3 class="ballot-measures-title">
+          What's on Your Ballot
+          <span class="source-badge" style="font-weight:normal">Google Civic</span>
+        </h3>
+        <ul class="ballot-list">
+          ${measures.map(m => `
+            <li class="ballot-item">
+              <div class="ballot-item-title">
+                ${m.url
+                  ? `<a href="${safeUrl(m.url)}" target="_blank" rel="noopener noreferrer">${esc(m.title || m.ballotTitle)}</a>`
+                  : `<span>${esc(m.title || m.ballotTitle)}</span>`}
+                ${m.district ? `<span class="ballot-district">${esc(m.district)}</span>` : ''}
+              </div>
+              ${m.subtitle ? `<p class="ballot-subtitle">${esc(m.subtitle)}</p>` : ''}
+              ${m.description ? `<p class="ballot-desc">${esc(m.description.slice(0, 200))}${m.description.length > 200 ? '…' : ''}</p>` : ''}
+            </li>`).join('')}
+        </ul>
+        <a href="https://ballotpedia.org/Sample_ballot_lookup_tool" target="_blank" rel="noopener noreferrer" class="ballot-more-link">
+          Full sample ballot on Ballotpedia →
+        </a>
+      </div>`;
+  }
+
+  return { renderResults, renderLocalOfficials, renderDistrictPanel, renderCivicTools, renderBallotMeasures, filterByLevel, toggleDetails, showLoading, showError, hideError, reset };
 })();
