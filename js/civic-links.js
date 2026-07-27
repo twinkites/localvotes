@@ -188,12 +188,74 @@ const CivicLinks = (() => {
     WY: null, // no statewide tracker found; contact county clerk
   };
 
+  // Public financial disclosure ("Statement of Financial Interests") search portals,
+  // run by each state's ethics commission. Terminology varies by state (Financial
+  // Disclosure, Statement of Economic Interest, etc.). Falls back to NCSL's ethics
+  // program hub, which links out to every state's ethics commission.
+  // null = state has no financial-disclosure requirement for elected officials at all.
+  // Where a state has no live public search database, the value points to that state's
+  // official informational/records-request page instead (see inline notes).
+  const FINANCIAL_DISCLOSURE_URLS = {
+    AL: 'https://ethics.alabama.gov/soei.aspx',
+    AK: 'https://apoc.doa.alaska.gov/filer-resources/financial-disclosure/',
+    AZ: 'https://azsos.gov/elections/campaign-finance-reporting/officeholder-financial-disclosure-statements',
+    AR: 'https://ethics-disclosures.sos.arkansas.gov/',
+    CA: 'https://form700search.fppc.ca.gov/',
+    CO: 'https://www.sos.state.co.us/pubs/elections/CampaignFinance/requestCopy.html', // no online search DB; requested via email from SOS
+    CT: 'https://portal.ct.gov/Ethics/Public-Official/POSE-Filings/Statements-of-Financial-Interests-Reports',
+    DE: 'https://depic.delaware.gov/financial-disclosure/', // informational page; records released via FOIA request
+    DC: 'https://efiler.bega.dc.gov/FDSSearch',
+    FL: 'https://disclosure.floridaethics.gov/PublicSearch/Filings',
+    GA: 'https://media.ethics.ga.gov/search/Financial/Financial_ByName.aspx',
+    HI: 'https://hawaiiethics.my.site.com/public/s/',
+    ID: null, // Idaho has no financial-interest disclosure system for elected officials
+    IL: 'https://apps.ilsos.gov/economicinterest/',
+    IN: 'https://www.in.gov/ig/search/search-disclosures/',
+    IA: 'https://webapp.iecdb.iowa.gov/pfd',
+    KS: 'https://kssos.org/elections/ssi/help/ssi_help_page.html', // filed with SOS; no live public search DB found
+    KY: 'https://apps.klec.ky.gov/',
+    LA: 'https://ethics.la.gov/PFDisclosure/SearchByName.aspx',
+    ME: 'https://www.maine.gov/ethics/financial-statements',
+    MD: 'https://efds.ethics.maryland.gov/',
+    MA: 'https://www.sfi.eth.mass.gov/Public/PublicHomePage.aspx', // official SFI portal; has had intermittent outages
+    MI: 'https://www.michigan.gov/sos/elections/disclosure/personal-financial-disclosure',
+    MN: 'https://cfb.mn.gov/citizen-resources/board-programs/overview/government-officials-disclosure/',
+    MS: 'https://www.ethics.webapps.ms.gov/SearchSEIForm.aspx',
+    MO: 'https://www.mec.mo.gov/MEC/PFD/Home.aspx',
+    MT: 'https://politicalpractices.mt.gov/Featured-Online-Services/',
+    NE: 'https://nadc.nebraska.gov/view-campaign-filings-personal-financial-disclosures-potential-conflicts-lobbying-reports-and-more',
+    NV: 'https://www.nvsos.gov/soscandidateservices/anonymousaccess/cefdsearchuu/search.aspx',
+    NH: 'https://15a.sos.nh.gov',
+    NJ: 'https://www3-elec.mwg.state.nj.us/ELEC_AGAA/candidate_pfd.aspx',
+    NM: 'https://www.sos.nm.gov/candidate-and-campaigns/search-public-information-data/financial-disclosures/',
+    NY: 'https://ethics.ny.gov/financial-disclosure-statements-elected-officials',
+    NC: 'https://ethicssei.nc.gov/Tools/Search?id=SEI',
+    ND: 'https://www.ethicscommission.nd.gov/', // no annual FD filing requirement for sitting officials currently; informational only
+    OH: 'https://ethics.ohio.gov/fds/index.html', // records-request based; no live public search portal found
+    OK: 'https://oklahoma.gov/ethics/state-officers-and-employees/financial-disclosure.html',
+    OR: 'https://www.oregon.gov/ogec/public-records/pages/seis.aspx',
+    PA: 'https://www.pa.gov/agencies/ethics/ethics-search/ethics-elibrary',
+    RI: 'https://ethics.ri.gov/financial-disclosure',
+    SC: 'https://ethicsfiling.sc.gov/public/home',
+    SD: 'https://sdsos.gov/elections-voting/financial-interest-statements/default.aspx', // not consistently in a live searchable DB
+    TN: 'https://apps.tn.gov/conflict/',
+    TX: 'https://www.ethics.state.tx.us/search/', // main TEC search portal; no stable deep link to PFS-by-name confirmed
+    UT: 'https://disclosures.utah.gov/Search/PublicSearch',
+    VT: 'https://sos.vermont.gov/elections/election-info-resources/candidates',
+    VA: 'https://ethicssearch.dls.virginia.gov/', // gated by CAPTCHA but functional
+    WA: 'https://www.pdc.wa.gov/political-disclosure-reporting-data/browse-search-data/financial-affairs-statements',
+    WV: 'https://ethics.wv.gov/financial-disclosure-statements-0',
+    WI: 'https://ethics.wi.gov/Pages/Ethics/StatementsOfEconomicInterests.aspx',
+    WY: 'https://sos.wyo.gov/Elections/Ethics.aspx', // no live searchable DB; SOS posts individual PDF forms
+  };
+
   function get(stateAbbr) {
     return {
-      registerUrl: REG_URLS[stateAbbr]    || 'https://vote.gov/register',
-      pollUrl:     POLL_URLS[stateAbbr]   || 'https://vote.gov/find-your-polling-place',
-      statusUrl:   STATUS_URLS[stateAbbr] || 'https://www.usa.gov/confirm-voter-registration',
-      trackUrl:    TRACK_URLS[stateAbbr]  || 'https://www.usa.gov/track-mail-in-ballot',
+      registerUrl:   REG_URLS[stateAbbr]                  || 'https://vote.gov/register',
+      pollUrl:       POLL_URLS[stateAbbr]                 || 'https://vote.gov/find-your-polling-place',
+      statusUrl:     STATUS_URLS[stateAbbr]                || 'https://www.usa.gov/confirm-voter-registration',
+      trackUrl:      TRACK_URLS[stateAbbr]                 || 'https://www.usa.gov/track-mail-in-ballot',
+      disclosureUrl: FINANCIAL_DISCLOSURE_URLS[stateAbbr]  || 'https://www.ncsl.org/ethics',
     };
   }
 

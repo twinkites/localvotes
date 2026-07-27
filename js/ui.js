@@ -658,6 +658,13 @@ Sincerely,
               <span>See if your absentee ballot was received</span>
             </div>
           </a>
+          <a href="${safeUrl(links.disclosureUrl)}" target="_blank" rel="noopener noreferrer" class="civic-tool-card">
+            <span class="civic-tool-icon" aria-hidden="true">📄</span>
+            <div class="civic-tool-body">
+              <strong>Financial Disclosures</strong>
+              <span>${esc(geo.state)} officials' statements of financial interest</span>
+            </div>
+          </a>
           ${pollingCard}
           ${earlyVoteCard}
           ${elCalendar}
