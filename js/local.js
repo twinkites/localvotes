@@ -84,6 +84,11 @@ const LocalOfficials = (() => {
       url: 'https://www.commoncause.org/find-your-representative/',
       description: 'Non-partisan tool for finding elected representatives at multiple levels',
     },
+    {
+      name: 'Townhall Project',
+      url: 'https://www.townhallproject.com/',
+      description: 'Database of in-person town halls and public events hosted by Members of Congress',
+    },
   ];
 
   // State-specific portals - only URLs verified working as of March 2026

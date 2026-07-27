@@ -2231,6 +2231,15 @@ a.civic-tool-card:hover {
   cursor: default;
 }
 
+.election-countdown {
+  display: inline-block;
+  margin: var(--space-1) 0;
+  font-weight: var(--font-semi);
+  color: var(--color-primary) !important;
+}
+
+html[data-theme="dark"] .election-countdown { color: var(--color-primary-light) !important; }
+
 @media print {
   .civic-tools { display: none; }
 }
@@ -2537,6 +2546,29 @@ html[data-theme="dark"] .election-dot.upcoming {
 
 html[data-theme="dark"] .ballot-item { background: var(--color-surface); }
 html[data-theme="dark"] .ballot-district { background: #2d3748; }
+
+.contest-candidate-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.contest-candidate {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.contest-candidate-party {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
 
 /* ---------------------------------------------------------------
    CIVIC TOOL — POLLING PLACE LIVE RESULT (Feature 5)

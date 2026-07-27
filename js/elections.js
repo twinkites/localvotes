@@ -71,7 +71,13 @@ const Elections = (() => {
   };
 
   function get(stateAbbr) {
-    return STATE_INFO[stateAbbr] || null;
+    const info = STATE_INFO[stateAbbr];
+    if (!info) return null;
+    const primaryMs = Date.parse(info.primaryDate);
+    return {
+      ...info,
+      primaryPast: Number.isNaN(primaryMs) ? info.primaryPast : primaryMs < Date.now(),
+    };
   }
 
   function getGeneral() {

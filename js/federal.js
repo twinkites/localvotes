@@ -34,7 +34,6 @@ const FederalAPI = (() => {
       address: [],
       channels: [],
       propublicaId: member.bioguideId,
-      votingRecord: null,
       campaignFinance: null,
     };
   }

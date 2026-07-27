@@ -125,5 +125,27 @@ const CivicInfo = (() => {
     return voterInfo?.election?.name || null;
   }
 
-  return { getVoterInfo, extractPollingPlace, extractEarlyVoting, extractBallotMeasures, extractElectionName };
+  // Extracts down-ballot candidate contests (county, judicial, school board, etc.)
+  // from a voterinfo response. Excludes referendums (see extractBallotMeasures).
+  function extractCandidateContests(voterInfo) {
+    if (!voterInfo) return [];
+    return (voterInfo.contests || [])
+      .filter(c => c.type && c.type !== 'Referendum')
+      .map(c => ({
+        office:   c.office || c.type,
+        type:     c.type,
+        district: c.district?.name || '',
+        candidates: (c.candidates || []).map(cd => ({
+          name:  cd.name,
+          party: cd.party || 'Unknown',
+          url:   cd.candidateUrl || null,
+        })),
+      }))
+      .filter(c => c.candidates.length);
+  }
+
+  return {
+    getVoterInfo, extractPollingPlace, extractEarlyVoting,
+    extractBallotMeasures, extractElectionName, extractCandidateContests,
+  };
 })();

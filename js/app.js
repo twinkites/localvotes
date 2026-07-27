@@ -334,6 +334,10 @@
     const ballotMeasures = CivicInfo.extractBallotMeasures(voterInfo);
     if (ballotMeasures.length) UI.renderBallotMeasures(ballotMeasures);
 
+    // Render down-ballot candidate contests (county, judicial, school board, etc.)
+    const candidateContests = CivicInfo.extractCandidateContests(voterInfo);
+    if (candidateContests.length) UI.renderCandidateContests(candidateContests);
+
     _updateMeta(geo.city, geo.stateAbbr, zip);
     MapView.init(officials.filter(o => !o.historical), geo, district);
     document.getElementById('results').scrollIntoView({ behavior: 'smooth' });

@@ -30,6 +30,11 @@ Usage:
   python local-officials-aggregator.py --council --state MA --max-cities 5  # test run
   python local-officials-aggregator.py --new-england                        # all 6 NE states
   python local-officials-aggregator.py --new-england --delay 8              # slower/polite
+
+  # Resume an interrupted run without re-scraping completed entries:
+  python local-officials-aggregator.py --state MA --resume
+  python local-officials-aggregator.py --state NY --delay 8 --resume
+  python local-officials-aggregator.py --council --state NY --delay 8 --resume
 """
 
 import argparse
@@ -96,10 +101,14 @@ BOARD_TITLES = frozenset({
     'president', 'vice president', 'vice-president',
     'clerk', 'secretary', 'treasurer',
     'chair', 'chairperson', 'chairman', 'chairwoman',
+    'vice chair', 'vice chairperson', 'vice chairman', 'vice chairwoman',
     'board member', 'board director', 'trustee', 'director',
     'member at large', 'at-large member',
     'area representative', 'zone representative',
     'governing board member',
+    # MA school committee terminology
+    'school committee member', 'committee member', 'school committee',
+    'student representative', 'student member',
 })
 
 TITLE_RE = re.compile(
@@ -139,6 +148,18 @@ SKIP_DOMAINS = frozenset({
     'niche.com', 'greatschools.org', 'publicschoolreview.com',
     'schooldigger.com', 'usnews.com', 'yelp.com', 'linkedin.com',
     'youtube.com', 'reddit.com', 'nextdoor.com', 'publicschoolsk12.com',
+    # Shared CDN/CMS platforms — DDG returns the CDN root, not the district site
+    'massachusettsschools.us',   # covers cdn.* and all other subdomains
+    # MA DOE profile aggregators — not district sites
+    'profiles.doe.mass.edu',
+    'profiles-public.doe.mass.edu',
+    # Census/county/school directories — not official district sites
+    'censusreporter.org',
+    'countyoffice.org',
+    'elementaryschools.org',
+    'schoolbug.org',
+    # Third-party school directory, not official district sites
+    'us-schools.net',
 })
 
 # Domains that are likely legitimate district/gov sites
@@ -242,7 +263,24 @@ STATE_CONFIG: dict[str, dict] = {
     'NH': {'fips': '33', 'bbox': '-72.5573,42.6970,-70.6101,45.3058'},
     'NJ': {'fips': '34', 'bbox': '-75.5596,38.9285,-73.8948,41.3574'},
     'NM': {'fips': '35', 'bbox': '-109.0502,31.3322,-103.0022,37.0001'},
-    'NY': {'fips': '36', 'bbox': '-79.7624,40.4960,-71.8562,45.0158'},
+    'NY': {
+        'fips': '36', 'bbox': '-79.7624,40.4960,-71.8562,45.0158',
+        'extra_titles': frozenset({
+            'board of education member', 'boe member', 'boe trustee',
+        }),
+        'extra_slugs': [
+            '/board-of-education',
+            '/boe',
+            '/board-of-education/members',
+            '/about/board-of-education',
+            '/district/board-of-education',
+            '/our-district/board-of-education',
+        ],
+        'nav_keywords': (
+            'board of education', 'school board', 'board members', 'trustees',
+            'boe', 'governing board',
+        ),
+    },
     'NC': {'fips': '37', 'bbox': '-84.3219,33.8428,-75.4601,36.5881'},
     'ND': {'fips': '38', 'bbox': '-104.0489,45.9350,-96.5543,49.0011'},
     'OH': {'fips': '39', 'bbox': '-84.8203,38.4033,-80.5189,41.9773'},
@@ -654,10 +692,12 @@ class BoardPageParser:
     """
     Extracts board member names and titles from a board page.
 
-    Three strategies in priority order:
+    Four strategies in priority order:
       1. Tables with header rows containing name/title columns
       2. Staff/member card elements (div, article, li) with board-title keywords
-      3. Plain-text extraction near board-related headings
+      3. Name-as-heading: h2/h3/h4 elements that look like person names whose
+         next sibling contains a board title (common in MA school committee pages)
+      4. Plain-text extraction near board/committee-related headings
     """
 
     def parse(self, html: str, source_url: str, district: DistrictInfo) -> list[Official]:
@@ -667,6 +707,7 @@ class BoardPageParser:
         officials = (
             self._parse_tables(soup, district, source_url)
             or self._parse_cards(soup, district, source_url)
+            or self._parse_name_headings(soup, district, source_url)
             or self._parse_text_blocks(soup, district, source_url)
         )
 
@@ -793,17 +834,63 @@ class BoardPageParser:
         return officials
 
     # ------------------------------------------------------------------
-    # Strategy 3: Text blocks near board headings
+    # Strategy 3: Name-as-heading (common in MA school committee pages)
+    # Each member's name is an h2/h3/h4 and the title is the next sibling.
+    # ------------------------------------------------------------------
+
+    # Words that look capitalized in headings but are not person-name words
+    _NON_NAME_WORDS = frozenset({
+        'who', 'what', 'when', 'where', 'why', 'how',
+        'the', 'our', 'your', 'their', 'this', 'that', 'these', 'those',
+        'are', 'is', 'was', 'were', 'be', 'been', 'being',
+        'have', 'has', 'had', 'do', 'does', 'did',
+        'dear', 'zoom', 'webinar', 'please', 'welcome', 'meet',
+        'view', 'see', 'read', 'learn', 'find', 'get', 'join',
+    })
+
+    def _parse_name_headings(self, soup: BeautifulSoup, district: DistrictInfo, url: str) -> list[Official]:
+        officials = []
+        for tag in soup.find_all(['h2', 'h3', 'h4']):
+            raw_name = tag.get_text(strip=True)
+            name = self._clean_name(raw_name)
+            if not name:
+                continue
+            # Reject if any word is a common non-name English word
+            words = [w.lower() for w in name.split()]
+            if any(w in self._NON_NAME_WORDS for w in words):
+                continue
+            # Check if the next sibling text looks like a board title
+            sib = tag.find_next_sibling()
+            if not sib:
+                continue
+            sib_text = sib.get_text(' ', strip=True)
+            if not TITLE_RE.search(sib_text):
+                continue
+            title_match = TITLE_RE.search(sib_text)
+            title = title_match.group().strip().title() if title_match else 'Board Member'
+            mailto = sib.find('a', href=re.compile(r'^mailto:', re.I))
+            email = mailto['href'].replace('mailto:', '').strip() if mailto else None
+            officials.append(Official(
+                name=name, title=title, jurisdiction=district.name,
+                contact_email=email,
+                source_url=url, zip_code=district.zip_code,
+            ))
+        # Require at least 3 hits — a real roster always has multiple members;
+        # fewer than 3 usually means section-header false positives
+        return officials if len(officials) >= 3 else []
+
+    # ------------------------------------------------------------------
+    # Strategy 4: Text blocks near board/committee headings
     # ------------------------------------------------------------------
 
     def _parse_text_blocks(self, soup: BeautifulSoup, district: DistrictInfo, url: str) -> list[Official]:
         officials = []
 
-        # Find the first heading that mentions "board"
+        # Find the first heading that mentions a board/committee body
         heading = None
         for tag in soup.find_all(['h1', 'h2', 'h3', 'h4']):
             txt = tag.get_text(strip=True).lower()
-            if 'board' in txt or 'trustee' in txt:
+            if any(kw in txt for kw in ('board', 'trustee', 'committee', 'commissioners')):
                 heading = tag
                 break
         if not heading:
@@ -1183,10 +1270,40 @@ class StateSchoolBoardAggregator:
     def default_output_path(self) -> str:
         return f'data/{self.state_abbr.lower()}_school_boards.json'
 
-    def run(self, output_path: Optional[str] = None):
+    def run(self, output_path: Optional[str] = None, resume: bool = False, retry_empty: bool = False):
         if output_path is None:
             output_path = self.default_output_path()
         os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
+
+        districts_out: list[dict] = []
+        city_index: dict[str, list[int]] = {}
+        processed_geoids: set[str] = set()
+
+        if resume and os.path.exists(output_path):
+            try:
+                with open(output_path, encoding='utf-8') as f:
+                    prev = json.load(f)
+                districts_out = prev.get('districts', [])
+                city_index    = prev.get('city_index', {})
+                # With --retry-empty, only skip districts that already have members
+                processed_geoids = {
+                    d['geoid'] for d in districts_out
+                    if d.get('geoid') and (not retry_empty or d.get('members'))
+                }
+                retry_count = sum(1 for d in districts_out if d.get('geoid') and not d.get('members')) if retry_empty else 0
+                logger.info(
+                    f'Resuming — {len(processed_geoids)} districts already done'
+                    + (f', {retry_count} empty districts will be retried' if retry_empty else '')
+                    + f' in {output_path}'
+                )
+                if retry_empty:
+                    # Remove empty entries so they'll be re-appended after retry
+                    districts_out = [d for d in districts_out if d.get('members')]
+                    city_index = {}  # Rebuild from survivors
+                    for idx, d in enumerate(districts_out):
+                        self._index(d['name'], idx, city_index)
+            except Exception as e:
+                logger.warning(f'Could not load previous output for resume: {e}')
 
         logger.info(f'Fetching all {self.state_abbr} school districts from TIGERweb...')
         raw_districts = self.district_fetcher.fetch_all()
@@ -1195,12 +1312,14 @@ class StateSchoolBoardAggregator:
             raw_districts = raw_districts[:self.max_districts]
             logger.info(f'Capped at {self.max_districts} districts (--max-districts)')
 
-        districts_out: list[dict] = []
-        city_index: dict[str, list[int]] = {}
-
         for i, raw in enumerate(raw_districts):
             name = raw['name']
             geoid = raw['geoid']
+
+            if geoid in processed_geoids:
+                logger.info(f'[{i + 1}/{len(raw_districts)}] Skip (done): {name}')
+                continue
+
             idx = len(districts_out)
 
             logger.info(f'[{i + 1}/{len(raw_districts)}] {name}')
@@ -1324,6 +1443,9 @@ class StateSchoolBoardAggregator:
 
 # New England states (the first target region for city council data)
 NEW_ENGLAND_STATES = ('CT', 'MA', 'ME', 'NH', 'RI', 'VT')
+
+# NYC Council covers all 5 boroughs — skip DDG search and use this directly
+NYC_COUNCIL_URL = 'https://council.nyc.gov/council-members/'
 
 # Common URL slugs for city/town council pages
 COUNCIL_PAGE_SLUGS = [
@@ -1662,10 +1784,38 @@ class CityCouncilAggregator:
     def default_output_path(self) -> str:
         return f'data/{self.state_abbr.lower()}_city_council.json'
 
-    def run(self, output_path: Optional[str] = None):
+    def run(self, output_path: Optional[str] = None, resume: bool = False, retry_empty: bool = False):
         if output_path is None:
             output_path = self.default_output_path()
         os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
+
+        councils_out: list[dict] = []
+        city_index: dict[str, list[int]] = {}
+        processed_cities: set[str] = set()
+
+        if resume and os.path.exists(output_path):
+            try:
+                with open(output_path, encoding='utf-8') as f:
+                    prev = json.load(f)
+                councils_out = prev.get('councils', [])
+                city_index   = prev.get('city_index', {})
+                processed_cities = {
+                    c['city'].lower() for c in councils_out
+                    if c.get('city') and (not retry_empty or c.get('members'))
+                }
+                retry_count = sum(1 for c in councils_out if c.get('city') and not c.get('members')) if retry_empty else 0
+                logger.info(
+                    f'Resuming — {len(processed_cities)} cities already done'
+                    + (f', {retry_count} empty cities will be retried' if retry_empty else '')
+                    + f' in {output_path}'
+                )
+                if retry_empty:
+                    councils_out = [c for c in councils_out if c.get('members')]
+                    city_index = {}
+                    for idx, c in enumerate(councils_out):
+                        city_index.setdefault(c['city'].lower(), []).append(idx)
+            except Exception as e:
+                logger.warning(f'Could not load previous output for resume: {e}')
 
         logger.info(f'Fetching {self.state_abbr} cities/towns from Census...')
         places = self.cities_fetcher.fetch(self.state_abbr)
@@ -1674,13 +1824,36 @@ class CityCouncilAggregator:
             places = places[:self.max_cities]
             logger.info(f'Capped at {self.max_cities} cities (--max-cities)')
 
-        councils_out: list[dict] = []
-        city_index: dict[str, list[int]] = {}
-
         for i, place in enumerate(places):
             city = place['name']
             idx  = len(councils_out)
             logger.info(f'[{i + 1}/{len(places)}] {city}, {self.state_abbr}')
+
+            if city.lower() in processed_cities:
+                logger.info(f'  → already processed, skipping')
+                continue
+
+            # NYC Council covers all 5 boroughs — skip DDG search and use the known URL
+            if self.state_abbr == 'NY' and city.lower() == 'new york':
+                council_entry: dict = {
+                    'name':         'New York City Council',
+                    'city':         city,
+                    'state':        self.state_abbr,
+                    'website':      'https://council.nyc.gov',
+                    'council_page': NYC_COUNCIL_URL,
+                    'members':      [],
+                }
+                time.sleep(self.delay)
+                try:
+                    r = self.session.get(NYC_COUNCIL_URL, timeout=15)
+                    r.raise_for_status()
+                    council_entry['members'] = self.parser.parse(r.text, NYC_COUNCIL_URL, city)
+                    logger.info(f'✓ NYC Council: {len(council_entry["members"])} member(s)')
+                except Exception as e:
+                    logger.error(f'NYC Council parse error: {e}')
+                councils_out.append(council_entry)
+                city_index.setdefault(city.lower(), []).append(idx)
+                continue
 
             time.sleep(self.delay)
             site = self.page_finder.find_site(city, self.state_abbr)
@@ -1796,6 +1969,12 @@ supported states: {supported_states}
     ap.add_argument('--output', default=None,
                     help='Output JSON file path (defaults: officials_output.json for --zip, '
                          'data/{state}_school_boards.json for --state)')
+    ap.add_argument('--resume', action='store_true',
+                    help='Resume a previous run — reads the existing output file and skips '
+                         'districts/cities already present in it')
+    ap.add_argument('--retry-empty', action='store_true',
+                    help='With --resume: re-process any district/city that was recorded but '
+                         'yielded 0 members (keeps successful entries, retries failures)')
     ap.add_argument('--delay', type=float, default=6.0,
                     help='Seconds between requests — be polite (default: 6.0)')
     ap.add_argument('--verbose', action='store_true',
@@ -1844,7 +2023,7 @@ supported states: {supported_states}
                 rate_limit_delay=args.delay,
                 max_cities=args.max_cities,
             )
-            agg.run(out_path)
+            agg.run(out_path, resume=args.resume, retry_empty=args.retry_empty)
         return
 
     # ── Statewide school board scrape ────────────────────────────────────────
@@ -1859,7 +2038,7 @@ supported states: {supported_states}
             max_districts=args.max_districts,
         )
         try:
-            agg.run(args.output)
+            agg.run(args.output, resume=args.resume, retry_empty=args.retry_empty)
         finally:
             agg.close()
         return

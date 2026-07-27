@@ -75,10 +75,125 @@ const CivicLinks = (() => {
     WI: 'https://myvote.wi.gov/en-us/FindMyPollingPlace',
   };
 
+  // Registration status check ("am I registered?") - state-specific lookup tools.
+  // null = no statewide online tool found; falls back to USA.gov's aggregator.
+  const STATUS_URLS = {
+    AL: 'https://myinfo.alabamavotes.gov/',
+    AK: 'https://myvoterinformation.alaska.gov/',
+    AZ: 'https://my.arizona.vote/',
+    AR: 'https://www.voterview.ar-nova.org/',
+    CA: 'https://voterstatus.sos.ca.gov/',
+    CO: 'https://www.coloradosos.gov/voter/pages/pub/olvr/findVoterReg.xhtml',
+    CT: 'https://portaldir.ct.gov/sots/LookUp.aspx',
+    DE: 'https://ivote.de.gov/',
+    DC: 'https://apps.dcboe.org/VRS',
+    FL: 'https://registration.elections.myflorida.com/CheckVoterStatus',
+    GA: 'https://mvp.sos.ga.gov/s/',
+    HI: 'https://olvr.hawaii.gov/',
+    ID: 'https://voteidaho.gov/',
+    IL: 'https://ova.elections.il.gov/Status.aspx',
+    IN: 'https://indianavoters.in.gov/',
+    IA: 'https://sos.iowa.gov/amiregistered',
+    KS: 'https://myvoteinfo.voteks.org/VoterView',
+    KY: 'https://vrsws.sos.ky.gov/vic/',
+    LA: 'https://voterportal.sos.la.gov/',
+    ME: 'https://www.maine.gov/portal/government/edemocracy/voter_lookup.php',
+    MD: 'https://voterservices.elections.maryland.gov/votersearch',
+    MA: 'https://www.sec.state.ma.us/voterregistrationsearch/',
+    MI: 'https://mvic.sos.state.mi.us/Voter/Index',
+    MN: 'https://mnvotes.sos.mn.gov/VoterStatus.aspx',
+    MS: 'https://www.sos.ms.gov/yall-vote',
+    MO: 'https://s1.sos.mo.gov/elections/voterlookup/',
+    MT: 'https://app.mt.gov/voterinfo/',
+    NE: 'https://www.votercheck.necvr.ne.gov/',
+    NV: 'https://www.nvsos.gov/votersearch/',
+    NH: 'https://app.sos.nh.gov/voterinformation',
+    NJ: 'https://voter.svrs.nj.gov/registration-check',
+    NM: 'https://voterportal.servis.sos.state.nm.us/',
+    NY: 'https://voterlookup.elections.ny.gov/',
+    NC: 'https://www.ncsbe.gov/voting/voter-lookup',
+    ND: null, // ND has no voter registration; no true "status" analog to link to
+    OH: 'https://voterlookup.ohiosos.gov/',
+    OK: 'https://okvoterportal.okelections.gov/',
+    OR: 'https://sos.oregon.gov/voting/pages/myvote.aspx',
+    PA: 'https://www.pavoterservices.pa.gov/pages/voterregistrationstatus.aspx',
+    RI: 'https://vote.sos.ri.gov/',
+    SC: 'https://vrems.scvotes.sc.gov/',
+    SD: 'https://vip.sdsos.gov/',
+    TN: 'https://tnmap.tn.gov/voterlookup/',
+    TX: 'https://teamrv-mvp.sos.texas.gov/',
+    UT: 'https://vote.utah.gov/voter-registration-portal/',
+    VT: 'https://mvp.vermont.gov/',
+    VA: 'https://vote.elections.virginia.gov/VoterInformation/Lookup/status',
+    WA: 'https://voter.votewa.gov/',
+    WV: 'https://apps.sos.wv.gov/Elections/Voter/AmIRegisteredToVote',
+    WI: 'https://myvote.wi.gov/',
+    WY: null, // no statewide online lookup found; registration verification is by county clerk only
+  };
+
+  // Absentee/mail ballot tracking tools - state-specific where the state runs its own
+  // (often the BallotTrax/Ballot Scout vendor, on a state-branded subdomain/portal).
+  // null = no unified statewide tool found (handled per-county); falls back to USA.gov.
+  const TRACK_URLS = {
+    AL: 'https://myinfo.alabamavotes.gov/voterview',
+    AK: 'https://myvoterinformation.alaska.gov/',
+    AZ: 'https://my.arizona.vote/AbsenteeTracker.aspx',
+    AR: 'https://portal.arkansas.gov/service/ar-absentee-ballot-search/',
+    CA: 'https://wheresmyballot.sos.ca.gov/',
+    CO: 'https://ballottrax.coloradosos.gov/voter/',
+    CT: 'https://portaldir.ct.gov/sots/LookUp.aspx',
+    DE: 'https://ivote.de.gov/',
+    DC: 'https://votedc.ballottrax.net/voter/',
+    FL: null, // no unified statewide tracker; handled per-county by Supervisors of Elections
+    GA: 'https://mvp.sos.ga.gov/s/',
+    HI: 'https://hawaii.ballottrax.net/voter/',
+    ID: 'https://voteidaho.gov/',
+    IL: null, // no unified statewide tracker; handled per-county
+    IN: 'https://indianavoters.in.gov/',
+    IA: 'https://apps.sos.iowa.gov/elections/absenteeballotstatus/absentee/search',
+    KS: 'https://myvoteinfo.voteks.org/VoterView',
+    KY: 'https://vrsws.sos.ky.gov/vic/',
+    LA: 'https://voterportal.sos.la.gov/',
+    ME: 'https://absenteeballotrequest.sos.maine.gov/BallotTracker/BallotTracker',
+    MD: 'https://voterservices.elections.maryland.gov/votersearch',
+    MA: 'https://www.sec.state.ma.us/wheredoivotema/track/trackmyballot.aspx',
+    MI: 'https://mvic.sos.state.mi.us/Voter/Index',
+    MN: 'https://mnvotes.sos.mn.gov/abstatus/index',
+    MS: null, // no statewide tracker found; contact county circuit clerk
+    MO: 'https://voteroutreach.sos.mo.gov/portal',
+    MT: 'https://votemt.gov/',
+    NE: 'https://www.votercheck.necvr.ne.gov/',
+    NV: 'https://myballot.nv.gov/',
+    NH: 'https://www.voteinnh.org/votetracker', // state-partnered nonprofit site, not .gov
+    NJ: 'https://voter.svrs.nj.gov/registration-check',
+    NM: 'https://www.sos.nm.gov/trackmyballot/',
+    NY: 'https://voterlookup.elections.ny.gov/',
+    NC: 'https://northcarolina.ballottrax.net/voter/',
+    ND: 'https://vip.sos.nd.gov/AbsenteeTracker.aspx',
+    OH: 'https://usoav.ohiosos.gov/',
+    OK: 'https://okvoterportal.okelections.gov/',
+    OR: 'https://sos.oregon.gov/voting/pages/myvote.aspx',
+    PA: 'https://www.pavoterservices.pa.gov/pages/ballottracking.aspx',
+    RI: 'https://ballottrax.sos.ri.gov/voter/',
+    SC: 'https://vrems.scvotes.sc.gov/',
+    SD: 'https://vip.sdsos.gov/',
+    TN: 'https://tnmap.tn.gov/voterlookup/',
+    TX: 'https://teamrv-mvp.sos.texas.gov/BallotTrackerApp/',
+    UT: 'https://vote.utah.gov/track-my-ballot/',
+    VT: 'https://mvp.vermont.gov/',
+    VA: 'https://app.enhancedvoting.com/voter/virginia/bt/track', // Ballot Scout vendor domain, not .gov - verify still state-sanctioned
+    WA: 'https://voter.votewa.gov/',
+    WV: 'https://apps.sos.wv.gov/Elections/voter/absenteeballottracking',
+    WI: 'https://myvote.wi.gov/',
+    WY: null, // no statewide tracker found; contact county clerk
+  };
+
   function get(stateAbbr) {
     return {
-      registerUrl: REG_URLS[stateAbbr] || 'https://vote.gov/register',
-      pollUrl:     POLL_URLS[stateAbbr] || 'https://vote.gov/find-your-polling-place',
+      registerUrl: REG_URLS[stateAbbr]    || 'https://vote.gov/register',
+      pollUrl:     POLL_URLS[stateAbbr]   || 'https://vote.gov/find-your-polling-place',
+      statusUrl:   STATUS_URLS[stateAbbr] || 'https://www.usa.gov/confirm-voter-registration',
+      trackUrl:    TRACK_URLS[stateAbbr]  || 'https://www.usa.gov/track-mail-in-ballot',
     };
   }
 
