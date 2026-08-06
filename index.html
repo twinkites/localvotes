@@ -8,13 +8,19 @@
   <meta property="og:title"       content="LocalVotes - Know Who Represents You" />
   <meta property="og:description" content="Look up every elected official from your ZIP code - Congress, state legislature, governor, school board, and more." />
   <meta property="og:url"         content="https://twinkites.github.io/localvotes/" />
-  <meta name="twitter:card"        content="summary" />
+  <meta property="og:image"       content="https://twinkites.github.io/localvotes/assets/og-image.png" />
+  <meta property="og:image:width"  content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt"   content="LocalVotes - Know who represents you" />
+  <meta name="twitter:card"        content="summary_large_image" />
   <meta name="twitter:title"       content="LocalVotes - Know Who Represents You" />
   <meta name="twitter:description" content="Look up every elected official from your ZIP code - Congress, state legislature, governor, school board, and more." />
+  <meta name="twitter:image"       content="https://twinkites.github.io/localvotes/assets/og-image.png" />
+  <link rel="canonical" href="https://twinkites.github.io/localvotes/" />
   <meta name="theme-color" content="#1a56db" />
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'none';
-    script-src  'self' https://unpkg.com;
+    script-src  'self' https://unpkg.com 'sha256-gk0XIxMYqMTpgNfDI+4Z5D496PNah/eEhOc4b7KghzQ=';
     style-src   'self' https://unpkg.com 'unsafe-inline';
     connect-src 'self'
                 https://api.zippopotam.us
@@ -43,6 +49,34 @@
   </noscript>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "LocalVotes",
+    "url": "https://twinkites.github.io/localvotes/",
+    "description": "Look up every elected official representing your ZIP code, from Congress to your local school board.",
+    "applicationCategory": "GovernmentApplication",
+    "operatingSystem": "Any",
+    "browserRequirements": "Requires JavaScript",
+    "isAccessibleForFree": true,
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Twin Kites LLC",
+      "url": "https://twinkites.github.io/localvotes/"
+    },
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://twinkites.github.io/localvotes/?zip={zip_code}",
+      "query-input": "required name=zip_code"
+    }
+  }
+  </script>
 </head>
 <body>
 
@@ -190,6 +224,9 @@
 
         <!-- District context panel - populated by UI.renderDistrictPanel() -->
         <div id="district-panel" class="district-panel hidden" aria-label="Your districts"></div>
+
+        <!-- Sample ballot summary card - populated by UI.renderSampleBallot() -->
+        <section id="sample-ballot-card" class="sample-ballot-card hidden" aria-label="Your sample ballot"></section>
 
         <!-- Card / Map view toggle -->
         <div class="view-toggle" role="group" aria-label="Switch display view">
@@ -483,6 +520,7 @@
   <script src="js/statewide.js"></script>
   <script src="js/school-boards.js"></script>
   <script src="js/city-council.js"></script>
+  <script src="js/ballot-card.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/app.js"></script>
 </body>

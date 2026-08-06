@@ -2155,6 +2155,93 @@ html[data-theme="dark"] .cd-chip     { background: #1e3a5f; color: #93c5fd; bord
 html[data-theme="dark"] .county-chip { background: #0d2418; color: #4ade80; border-color: #166534; }
 
 /* ---------------------------------------------------------------
+   SAMPLE BALLOT CARD (shareable summary)
+--------------------------------------------------------------- */
+
+.sample-ballot-card {
+  margin-bottom: var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.sample-ballot-inner {
+  padding: var(--space-5) var(--space-6);
+}
+
+.sample-ballot-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.sample-ballot-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semi);
+  margin: 0;
+}
+
+.sample-ballot-sub {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: var(--space-1) 0 0;
+}
+
+.sample-ballot-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.sample-ballot-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-5);
+}
+
+.sample-ballot-level {
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0 0 var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid currentColor;
+}
+
+.sample-ballot-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sample-ballot-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.sample-ballot-name {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+}
+
+.sample-ballot-office {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+@media print {
+  .sample-ballot-actions { display: none; }
+}
+
+/* ---------------------------------------------------------------
    CIVIC TOOLS (register, polling, election)
 --------------------------------------------------------------- */
 
@@ -2598,6 +2685,7 @@ html[data-theme="dark"] .ballot-district { background: #2d3748; }
 [data-print-mode="cheatsheet"] .card-details,
 [data-print-mode="cheatsheet"] .results-header-actions,
 [data-print-mode="cheatsheet"] .district-panel,
+[data-print-mode="cheatsheet"] .sample-ballot-card,
 [data-print-mode="cheatsheet"] .data-warning {
   display: none !important;
 }

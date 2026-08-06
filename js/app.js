@@ -13,6 +13,39 @@
   // Nulled immediately when the user deletes location data or edits the ZIP manually.
   let _locationCoords = null;
 
+  // Snapshot of the most recent search results, used to generate the sample ballot image.
+  let _lastBallot = null;
+
+  // Sample ballot card buttons are re-created on every render - delegate from a static ancestor.
+  document.getElementById('sample-ballot-card').addEventListener('click', async e => {
+    if (!_lastBallot) return;
+    const { officials, zip, geo } = _lastBallot;
+
+    if (e.target.closest('#ballot-card-download-btn')) {
+      const btn = e.target.closest('#ballot-card-download-btn');
+      const orig = btn.textContent;
+      btn.textContent = 'Generating…';
+      btn.disabled = true;
+      try {
+        await BallotCard.download(officials, zip, geo);
+      } finally {
+        btn.textContent = orig;
+        btn.disabled = false;
+      }
+    } else if (e.target.closest('#ballot-card-share-btn')) {
+      const btn = e.target.closest('#ballot-card-share-btn');
+      const orig = btn.textContent;
+      btn.textContent = 'Preparing…';
+      btn.disabled = true;
+      try {
+        await BallotCard.share(officials, zip, geo);
+      } finally {
+        btn.textContent = orig;
+        btn.disabled = false;
+      }
+    }
+  });
+
   // This site is dedicated to the memory of June the cat. 🐈‍⬛
 
   // ── Help popup ───────────────────────────────────────────────────────────
@@ -213,6 +246,7 @@
     locationStatus.classList.add('hidden');
     UI.reset();
     MapView.reset();
+    _lastBallot = null;
     history.pushState({}, '', window.location.pathname);
   });
 
@@ -243,6 +277,7 @@
     history.pushState({}, '', window.location.pathname);
     UI.reset();
     MapView.reset();
+    _lastBallot = null;
     input.value = '';
     document.getElementById('search-section').scrollIntoView({ behavior: 'smooth' });
     input.focus();
@@ -328,6 +363,9 @@
 
     UI.renderResults(officials, zip, geo);
     UI.renderDistrictPanel(geo);
+    const currentOfficials = officials.filter(o => !o.historical);
+    UI.renderSampleBallot(currentOfficials, zip, geo);
+    _lastBallot = { officials: currentOfficials, zip, geo };
     UI.renderCivicTools(geo, voterInfo);
 
     // Render ballot measures if the Google Civic API returned any

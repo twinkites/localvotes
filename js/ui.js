@@ -464,6 +464,45 @@ Sincerely,
     }
   }
 
+  function renderSampleBallot(officials, zip, geo) {
+    const card = document.getElementById('sample-ballot-card');
+    if (!card) return;
+
+    const groups = BallotCard.groupByLevel(officials);
+    if (!groups.length) { card.classList.add('hidden'); card.innerHTML = ''; return; }
+
+    const locLabel = geo?.city ? `${geo.city}, ${geo.stateAbbr}` : '';
+
+    card.innerHTML = `
+      <div class="sample-ballot-inner">
+        <div class="sample-ballot-header">
+          <div>
+            <h3 class="sample-ballot-title">⭐ Your Sample Ballot</h3>
+            <p class="sample-ballot-sub">ZIP ${esc(zip)}${locLabel ? ` · ${esc(locLabel)}` : ''}</p>
+          </div>
+          <div class="sample-ballot-actions">
+            <button type="button" id="ballot-card-download-btn" class="results-action-btn">📥 Download Image</button>
+            <button type="button" id="ballot-card-share-btn" class="results-action-btn">📤 Share</button>
+          </div>
+        </div>
+        <div class="sample-ballot-groups">
+          ${groups.map(g => `
+            <div class="sample-ballot-group">
+              <h4 class="sample-ballot-level" style="color:${BallotCard.LEVEL_COLORS[g.level] || '#1a202c'}">${esc(g.level)}</h4>
+              <ul class="sample-ballot-list">
+                ${g.officials.map(o => `
+                  <li class="sample-ballot-item">
+                    <span class="sample-ballot-name">${esc(o.name)}</span>
+                    <span class="sample-ballot-office">${esc(o.office || '')}</span>
+                  </li>`).join('')}
+              </ul>
+            </div>`).join('')}
+        </div>
+      </div>`;
+
+    card.classList.remove('hidden');
+  }
+
   function filterByLevel(level, btn) {
     document.querySelectorAll('.tab-pill').forEach(t => {
       t.classList.remove('active');
@@ -499,6 +538,8 @@ Sincerely,
     if (local) { local.classList.add('hidden'); local.innerHTML = ''; }
     const panel = document.getElementById('district-panel');
     if (panel) { panel.classList.add('hidden'); panel.innerHTML = ''; }
+    const ballotCard = document.getElementById('sample-ballot-card');
+    if (ballotCard) { ballotCard.classList.add('hidden'); ballotCard.innerHTML = ''; }
     const tools = document.getElementById('civic-tools');
     if (tools) { tools.classList.add('hidden'); tools.innerHTML = ''; }
     const ballot = document.getElementById('ballot-measures-section');
@@ -751,7 +792,7 @@ Sincerely,
 
   return {
     renderResults, renderLocalOfficials, renderDistrictPanel, renderCivicTools,
-    renderBallotMeasures, renderCandidateContests, filterByLevel, toggleDetails,
-    showLoading, showError, hideError, reset,
+    renderBallotMeasures, renderCandidateContests, renderSampleBallot, filterByLevel,
+    toggleDetails, showLoading, showError, hideError, reset,
   };
 })();
