@@ -13,6 +13,11 @@ const OpenStatesAPI = (() => {
   // Exposed so app.js can surface a user-facing notice when a rate limit is hit.
   let _lastError = null;
 
+  // Session cache, keyed by rounded lat/lng (~1km) so repeat/back-and-forth searches
+  // for the same area don't re-spend the shared daily rate limit. Cleared on reload.
+  const _officialsCache = {};
+  const _billsCache = {};
+
   function normalizeOfficial(person) {
     const role = person.current_role || {};
     const chamber = role.org_classification || '';
@@ -66,6 +71,10 @@ const OpenStatesAPI = (() => {
     _lastError = null;
     const key = CONFIG.OPENSTATES_API_KEY;
     if (!key) return [];
+
+    const cacheKey = `${lat.toFixed(2)},${lng.toFixed(2)}`;
+    if (_officialsCache[cacheKey]) return _officialsCache[cacheKey];
+
     try {
       const res = await fetch(
         `${BASE}/people.geo?lat=${lat}&lng=${lng}&apikey=${key}`
@@ -82,7 +91,9 @@ const OpenStatesAPI = (() => {
         return [];
       }
       const data = await res.json();
-      return (data.results || []).map(normalizeOfficial);
+      const officials = (data.results || []).map(normalizeOfficial);
+      _officialsCache[cacheKey] = officials;
+      return officials;
     } catch {
       _lastError = { type: 'network_error', message: 'Could not reach OpenStates. Check your connection and try again.' };
       return [];
@@ -96,6 +107,12 @@ const OpenStatesAPI = (() => {
     if (official.level !== 'State' || !official.openStatesId) return official;
     const key = CONFIG.OPENSTATES_API_KEY;
     if (!key) return official;
+
+    if (_billsCache[official.openStatesId]) {
+      if (_billsCache[official.openStatesId].length) official.stateBills = _billsCache[official.openStatesId];
+      return official;
+    }
+
     try {
       const res = await fetch(
         `${BASE}/bills?sponsor=${encodeURIComponent(official.openStatesId)}&sort=updated_at&per_page=5&apikey=${key}`
@@ -109,6 +126,7 @@ const OpenStatesAPI = (() => {
         introducedDate: b.first_action_date ? b.first_action_date.slice(0, 10) : '',
         latestAction: b.latest_action_description || '',
       }));
+      _billsCache[official.openStatesId] = bills;
       if (bills.length) official.stateBills = bills;
     } catch { /* silent fail */ }
     return official;

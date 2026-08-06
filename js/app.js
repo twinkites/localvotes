@@ -316,20 +316,21 @@
     const district = geoCtx.congressionalDistrict;
     Object.assign(geo, geoCtx);
 
-    // Step 3: Fetch officials and voter info in parallel
+    // Step 3: Fetch the fast primary sources in parallel and render as soon as they land.
+    // Statewide executives (Wikidata SPARQL) and per-official enrichment (FEC/Congress/
+    // OpenStates bills) are comparatively slow and non-essential for first paint, so they
+    // run separately in the background and trigger a re-render when they finish (Step 5).
     // Google Civic API expects city-first format: "City, ST ZIP"
     const address = `${geo.city}, ${geo.stateAbbr} ${zip}`;
     const [
       federalOfficials,
       stateOfficials,
-      statewideOfficials,
       schoolBoardOfficials,
       cityCouncilOfficials,
       voterInfo,
     ] = await Promise.all([
       FederalAPI.getOfficials(geo.stateAbbr, district),
       OpenStatesAPI.getOfficials(geo.lat, geo.lng),
-      StatewideAPI.getOfficials(geo.stateAbbr),
       SchoolBoards.lookup(geo.city, geo.stateAbbr),
       CityCouncil.lookup(geo.city, geo.stateAbbr),
       CivicInfo.getVoterInfo(address, geo.stateAbbr),
@@ -341,14 +342,7 @@
       UI.showError(openStatesError.message);
     }
 
-    const officials = [...federalOfficials, ...statewideOfficials, ...stateOfficials, ...schoolBoardOfficials, ...cityCouncilOfficials];
-
-    // Step 4: Enrich with secondary data sources in parallel (all silent-fail)
-    await Promise.all(officials.map(o => Promise.all([
-      FECAPI.enrich(o),
-      CongressAPI.enrich(o),
-      OpenStatesAPI.enrich(o),
-    ])));
+    const officials = [...federalOfficials, ...stateOfficials, ...schoolBoardOfficials, ...cityCouncilOfficials];
 
     SubmitForm.setZip(zip);
     UI.showLoading(false);
@@ -361,6 +355,33 @@
       return;
     }
 
+    // Step 4: First paint - render immediately with what we have so far.
+    _renderAll(officials, zip, geo, district, voterInfo);
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+
+    // Step 5: Background enrichment - statewide execs (Wikidata) and per-official
+    // FEC/Congress/OpenStates data. Officials are enriched in place, so once both
+    // finish we just re-render with the same (now-fuller) array. Neither blocks first paint.
+    const statewidePromise = StatewideAPI.getOfficials(geo.stateAbbr).then(statewideOfficials => {
+      if (statewideOfficials.length) officials.splice(federalOfficials.length, 0, ...statewideOfficials);
+    });
+    const enrichPromise = Promise.all(officials.map(o => Promise.all([
+      FECAPI.enrich(o),
+      CongressAPI.enrich(o),
+      OpenStatesAPI.enrich(o),
+    ])));
+
+    Promise.all([statewidePromise, enrichPromise]).then(() => {
+      const activeLevel = document.querySelector('.tab-pill.active')?.dataset.level;
+      _renderAll(officials, zip, geo, district, voterInfo);
+      if (activeLevel && activeLevel !== 'All') {
+        const btn = document.querySelector(`.tab-pill[data-level="${CSS.escape(activeLevel)}"]`);
+        if (btn) UI.filterByLevel(activeLevel, btn);
+      }
+    });
+  }
+
+  function _renderAll(officials, zip, geo, district, voterInfo) {
     UI.renderResults(officials, zip, geo);
     UI.renderDistrictPanel(geo);
     const currentOfficials = officials.filter(o => !o.historical);
@@ -377,8 +398,7 @@
     if (candidateContests.length) UI.renderCandidateContests(candidateContests);
 
     _updateMeta(geo.city, geo.stateAbbr, zip);
-    MapView.init(officials.filter(o => !o.historical), geo, district);
-    document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+    MapView.init(currentOfficials, geo, district);
   }
 
   function _updateMeta(city, stateAbbr, zip) {
